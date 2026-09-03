@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Histórico - VoidBrowser</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            width: 100vw;
+            height: 100vh;
+
+            overflow-y: auto;
+
+            font-family: Arial, sans-serif;
+
+            color: white;
+
+            background:
+                radial-gradient(
+                    circle at 50% 0%,
+                    #151b35 0%,
+                    #090c18 35%,
+                    #05060b 70%
+                );
+        }
+
+
+        .container {
+            max-width: 720px;
+
+            margin: 0 auto;
+
+            padding: 50px 24px 60px;
+        }
+
+
+        .header {
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            margin-bottom: 30px;
+        }
+
+
+        h1 {
+            margin: 0;
+
+            font-size: 28px;
+
+            letter-spacing: 1px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #6f7cff,
+                    #9b5cff,
+                    #d45cff
+                );
+
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+
+        #clear-link {
+            padding: 9px 16px;
+
+            border-radius: 20px;
+
+            background: #101423;
+
+            border: 1px solid #2a2140;
+
+            color: #b39dff;
+
+            font-size: 13px;
+
+            text-decoration: none;
+
+            cursor: pointer;
+
+            transition: 0.2s;
+        }
+
+
+        #clear-link:hover {
+            border-color: #695cff;
+
+            background: #171331;
+        }
+
+
+        .empty {
+            margin-top: 60px;
+
+            text-align: center;
+
+            color: #656b80;
+
+            font-size: 14px;
+        }
+
+
+        .day-group {
+            margin-bottom: 26px;
+        }
+
+
+        .day-label {
+            color: #7d849c;
+
+            font-size: 12px;
+
+            letter-spacing: 1px;
+
+            text-transform: uppercase;
+
+            margin-bottom: 10px;
+        }
+
+
+        .entry {
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+
+            padding: 12px 14px;
+
+            border-radius: 10px;
+
+            background: #101423;
+
+            border: 1px solid #1c2135;
+
+            margin-bottom: 8px;
+
+            text-decoration: none;
+
+            color: inherit;
+        }
+
+
+        .entry:hover {
+            border-color: #383f68;
+
+            background: #12172a;
+        }
+
+
+        .entry-time {
+            flex-shrink: 0;
+
+            width: 52px;
+
+            color: #656b80;
+
+            font-size: 12px;
+        }
+
+
+        .entry-favicon {
+            width: 18px;
+            height: 18px;
+
+            flex-shrink: 0;
+
+            object-fit: contain;
+
+            border-radius: 3px;
+        }
+
+
+        .entry-info {
+            min-width: 0;
+
+            flex: 1;
+        }
+
+
+        .entry-title {
+            font-size: 14px;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        .entry-url {
+            margin-top: 2px;
+
+            font-size: 12px;
+
+            color: #656b80;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <div class="header">
+
+            <h1>Histórico</h1>
+
+            <a id="clear-link" href="void://history/clear">
+                Limpar histórico
+            </a>
+
+        </div>
+
+
+        <div id="list"></div>
+
+
+        <div id="empty" class="empty" style="display: none;">
+            Nenhuma página visitada ainda.
+        </div>
+
+    </div>
+
+
+    <script>
+
+        function formatTime(timestamp) {
+
+            const date = new Date(timestamp);
+
+            return date.toLocaleTimeString(
+                "pt-BR",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }
+            );
+
+        }
+
+
+        function formatDay(timestamp) {
+
+            const date = new Date(timestamp);
+
+            return date.toLocaleDateString(
+                "pt-BR",
+                {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            );
+
+        }
+
+
+        function escapeHTML(value) {
+
+            const div = document.createElement("div");
+
+            div.textContent = value || "";
+
+            return div.innerHTML;
+
+        }
+
+
+        // ==========================================
+        // RENDERIZAR HISTÓRICO
+        // Chamado pelo processo principal via
+        // executeJavaScript, com os dados já prontos.
+        // ==========================================
+
+        window.renderHistory = function (entries) {
+
+            const list =
+                document.getElementById("list");
+
+            const empty =
+                document.getElementById("empty");
+
+            list.innerHTML = "";
+
+
+            if (!entries || entries.length === 0) {
+
+                empty.style.display = "block";
+
+                return;
+            }
+
+
+            empty.style.display = "none";
+
+
+            const groups = new Map();
+
+            for (const entry of entries) {
+
+                const day =
+                    formatDay(entry.visitedAt);
+
+                if (!groups.has(day)) {
+
+                    groups.set(day, []);
+
+                }
+
+                groups.get(day).push(entry);
+
+            }
+
+
+            for (const [day, dayEntries] of groups) {
+
+                const groupElement =
+                    document.createElement("div");
+
+                groupElement.className = "day-group";
+
+
+                const label =
+                    document.createElement("div");
+
+                label.className = "day-label";
+
+                label.textContent = day;
+
+                groupElement.appendChild(label);
+
+
+                for (const entry of dayEntries) {
+
+                    const link =
+                        document.createElement("a");
+
+                    link.className = "entry";
+
+                    link.href = entry.url;
+
+
+                    link.innerHTML = `
+                        <span class="entry-time">${formatTime(entry.visitedAt)}</span>
+                        <img
+                            class="entry-favicon"
+                            src="${escapeHTML(entry.favicon) || 'assets/voidbrowser-icon.png'}"
+                            onerror="this.onerror=null; this.src='assets/voidbrowser-icon.png';"
+                        >
+                        <span class="entry-info">
+                            <div class="entry-title">${escapeHTML(entry.title)}</div>
+                            <div class="entry-url">${escapeHTML(entry.url)}</div>
+                        </span>
+                    `;
+
+                    groupElement.appendChild(link);
+
+                }
+
+                list.appendChild(groupElement);
+
+            }
+
+        };
+
+    </script>
+
+</body>
+
+</html>

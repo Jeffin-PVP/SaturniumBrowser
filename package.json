@@ -1,0 +1,44 @@
+{
+  "name": "VoidBrowser",
+  "version": "1.0.1",
+  "description": "Meu navegador personalizado",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^44.1.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.voidbrowser.browser",
+    "productName": "VoidBrowser",
+
+    "directories": {
+      "output": "dist"
+    },
+
+    "files": [
+      "**/*"
+    ],
+
+    "win": {
+      "target": "nsis",
+      "icon": "assets/voidbrowser.ico"
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+
+      "shortcutName": "VoidBrowser"
+    }
+  }
+}
