@@ -1,7 +1,8 @@
 const {
     app,
     BrowserWindow,
-    ipcMain
+    ipcMain,
+    Menu
 } = require("electron");
 
 const path =
@@ -222,6 +223,28 @@ function handleKeyboardInput(
 
 
     // ======================================
+    // CTRL + SHIFT + T
+    // REABRIR ABA FECHADA
+    // ======================================
+
+    if (
+        input.control &&
+        input.shift &&
+        input.key.toLowerCase() === "t"
+    ) {
+
+        event.preventDefault();
+
+
+        browserManager.reopenClosedTab();
+
+
+        return;
+
+    }
+
+
+    // ======================================
     // CTRL + SHIFT + TAB
     // ABA ANTERIOR
     // ======================================
@@ -284,6 +307,28 @@ function handleKeyboardInput(
 
 
         browserManager.openHistory();
+
+
+        return;
+
+    }
+
+
+    // ======================================
+    // CTRL + J
+    // DOWNLOADS
+    // ======================================
+
+    if (
+        input.control &&
+        !input.shift &&
+        input.key.toLowerCase() === "j"
+    ) {
+
+        event.preventDefault();
+
+
+        browserManager.openDownloads();
 
 
         return;
@@ -493,6 +538,283 @@ ipcMain.on(
 
 
         browserManager.openHistory();
+
+    }
+);
+
+
+// ==========================================
+// FIXAR / DESAFIXAR ABA
+// ==========================================
+
+ipcMain.on(
+    "tab-toggle-pin",
+    (event, id) => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.togglePinTab(
+            id
+        );
+
+    }
+);
+
+
+// ==========================================
+// REABRIR ÚLTIMA ABA FECHADA
+// ==========================================
+
+ipcMain.on(
+    "tab-reopen-closed",
+    () => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.reopenClosedTab();
+
+    }
+);
+
+
+// ==========================================
+// DOWNLOADS
+// ==========================================
+
+ipcMain.on(
+    "downloads-open",
+    () => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.openDownloads();
+
+    }
+);
+
+
+ipcMain.on(
+    "downloads-bar-close",
+    () => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.closeDownloadsBar();
+
+    }
+);
+
+
+ipcMain.on(
+    "downloads-cancel",
+    (event, id) => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.cancelDownload(
+            id
+        );
+
+    }
+);
+
+
+ipcMain.on(
+    "downloads-open-file",
+    (event, id) => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.openDownloadFile(
+            id
+        );
+
+    }
+);
+
+
+ipcMain.on(
+    "downloads-show-in-folder",
+    (event, id) => {
+
+        if (!browserManager) {
+
+            return;
+
+        }
+
+
+        browserManager.showDownloadInFolder(
+            id
+        );
+
+    }
+);
+
+
+// ==========================================
+// MENU PRINCIPAL (TRÊS PONTINHOS)
+// ==========================================
+
+ipcMain.on(
+    "main-menu-open",
+    () => {
+
+        if (
+            !browserManager ||
+            !win
+        ) {
+
+            return;
+
+        }
+
+
+        const template = [
+
+            {
+                label: "Histórico",
+
+                accelerator: "Ctrl+H",
+
+                click: () => {
+
+                    browserManager.openHistory();
+
+                }
+            },
+
+            {
+                label: "Reabrir aba fechada",
+
+                accelerator: "Ctrl+Shift+T",
+
+                click: () => {
+
+                    browserManager.reopenClosedTab();
+
+                }
+            },
+
+            {
+                label: "Downloads",
+
+                accelerator: "Ctrl+J",
+
+                click: () => {
+
+                    browserManager.openDownloads();
+
+                }
+            }
+
+        ];
+
+
+        Menu.buildFromTemplate(
+            template
+        ).popup({
+            window: win
+        });
+
+    }
+);
+
+
+// ==========================================
+// MENU DE CONTEXTO DA ABA (CLIQUE DIREITO)
+// ==========================================
+
+ipcMain.on(
+    "tab-context-menu",
+    (event, payload) => {
+
+        if (
+            !browserManager ||
+            !win
+        ) {
+
+            return;
+
+        }
+
+
+        const { id, pinned } =
+            payload;
+
+
+        const template = [
+
+            {
+                label:
+                    pinned
+                        ? "Desafixar aba"
+                        : "Fixar aba",
+
+                click: () => {
+
+                    browserManager.togglePinTab(
+                        id
+                    );
+
+                }
+            },
+
+            {
+                type: "separator"
+            },
+
+            {
+                label:
+                    "Fechar aba",
+
+                click: () => {
+
+                    browserManager.closeTab(
+                        id
+                    );
+
+                }
+            }
+
+        ];
+
+
+        Menu.buildFromTemplate(
+            template
+        ).popup({
+            window: win
+        });
 
     }
 );

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Downloads - VoidBrowser</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            width: 100vw;
+            height: 100vh;
+
+            overflow-y: auto;
+
+            font-family: Arial, sans-serif;
+
+            color: white;
+
+            background:
+                radial-gradient(
+                    circle at 50% 0%,
+                    #151b35 0%,
+                    #090c18 35%,
+                    #05060b 70%
+                );
+        }
+
+
+        .container {
+            max-width: 720px;
+
+            margin: 0 auto;
+
+            padding: 50px 24px 60px;
+        }
+
+
+        .header {
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            margin-bottom: 30px;
+        }
+
+
+        h1 {
+            margin: 0;
+
+            font-size: 28px;
+
+            letter-spacing: 1px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #6f7cff,
+                    #9b5cff,
+                    #d45cff
+                );
+
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+
+        #clear-link {
+            padding: 9px 16px;
+
+            border-radius: 20px;
+
+            background: #101423;
+
+            border: 1px solid #2a2140;
+
+            color: #b39dff;
+
+            font-size: 13px;
+
+            text-decoration: none;
+
+            cursor: pointer;
+        }
+
+
+        #clear-link:hover {
+            border-color: #695cff;
+
+            background: #171331;
+        }
+
+
+        .empty {
+            margin-top: 60px;
+
+            text-align: center;
+
+            color: #656b80;
+
+            font-size: 14px;
+        }
+
+
+        .day-group {
+            margin-bottom: 26px;
+        }
+
+
+        .day-label {
+            color: #7d849c;
+
+            font-size: 12px;
+
+            letter-spacing: 1px;
+
+            text-transform: uppercase;
+
+            margin-bottom: 10px;
+        }
+
+
+        .entry {
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+
+            padding: 12px 14px;
+
+            border-radius: 10px;
+
+            background: #101423;
+
+            border: 1px solid #1c2135;
+
+            margin-bottom: 8px;
+        }
+
+
+        .entry-icon {
+            flex-shrink: 0;
+
+            width: 34px;
+            height: 34px;
+
+            border-radius: 8px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-size: 16px;
+
+            background: #171b29;
+        }
+
+
+        .entry-icon.completed {
+            color: #7fe0a8;
+        }
+
+
+        .entry-icon.progressing {
+            color: #7c9cff;
+        }
+
+
+        .entry-icon.failed {
+            color: #ff8080;
+        }
+
+
+        .entry-info {
+            min-width: 0;
+
+            flex: 1;
+        }
+
+
+        .entry-title {
+            font-size: 14px;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        .entry-sub {
+            margin-top: 3px;
+
+            font-size: 12px;
+
+            color: #656b80;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        .entry-progress {
+            margin-top: 6px;
+
+            height: 4px;
+
+            border-radius: 2px;
+
+            background: #1c2135;
+
+            overflow: hidden;
+        }
+
+
+        .entry-progress-fill {
+            height: 100%;
+
+            background: #7c5cff;
+        }
+
+
+        .entry-actions {
+            flex-shrink: 0;
+
+            display: flex;
+
+            gap: 6px;
+        }
+
+
+        .entry-actions a,
+        .entry-actions span {
+            display: inline-block;
+
+            padding: 6px 10px;
+
+            border-radius: 6px;
+
+            background: #171b29;
+
+            border: 1px solid #262c40;
+
+            color: #b39dff;
+
+            font-size: 12px;
+
+            text-decoration: none;
+
+            cursor: pointer;
+        }
+
+
+        .entry-actions a:hover {
+            border-color: #695cff;
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <div class="header">
+
+            <h1>Downloads</h1>
+
+            <a id="clear-link" href="void://downloads/clear">
+                Limpar concluídos
+            </a>
+
+        </div>
+
+
+        <div id="list"></div>
+
+
+        <div id="empty" class="empty" style="display: none;">
+            Nenhum download ainda.
+        </div>
+
+    </div>
+
+
+    <script>
+
+        function formatDay(timestamp) {
+
+            const date = new Date(timestamp);
+
+            return date.toLocaleDateString(
+                "pt-BR",
+                {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            );
+
+        }
+
+
+        function formatBytes(bytes) {
+
+            if (!bytes || bytes <= 0) {
+                return "0 KB";
+            }
+
+            const units = ["B", "KB", "MB", "GB"];
+
+            let value = bytes;
+
+            let i = 0;
+
+            while (
+                value >= 1024 &&
+                i < units.length - 1
+            ) {
+
+                value /= 1024;
+
+                i++;
+
+            }
+
+            return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+
+        }
+
+
+        function escapeHTML(value) {
+
+            const div = document.createElement("div");
+
+            div.textContent = value || "";
+
+            return div.innerHTML;
+
+        }
+
+
+        function statusInfo(entry) {
+
+            if (entry.state === "progressing") {
+
+                const percent =
+                    entry.totalBytes > 0
+                        ? Math.round(
+                            (entry.receivedBytes / entry.totalBytes) * 100
+                        )
+                        : null;
+
+                return {
+                    icon: "⬇",
+                    iconClass: "progressing",
+                    text:
+                        percent !== null
+                            ? `Baixando — ${percent}% de ${formatBytes(entry.totalBytes)}`
+                            : `Baixando — ${formatBytes(entry.receivedBytes)}`,
+                    percent
+                };
+
+            }
+
+            if (entry.state === "completed") {
+
+                return {
+                    icon: "✓",
+                    iconClass: "completed",
+                    text: `Concluído — ${formatBytes(entry.totalBytes)}`,
+                    percent: null
+                };
+
+            }
+
+            if (entry.state === "cancelled") {
+
+                return {
+                    icon: "✕",
+                    iconClass: "failed",
+                    text: "Cancelado",
+                    percent: null
+                };
+
+            }
+
+            return {
+                icon: "✕",
+                iconClass: "failed",
+                text: "Interrompido",
+                percent: null
+            };
+
+        }
+
+
+        // ==========================================
+        // RENDERIZAR DOWNLOADS
+        // ==========================================
+
+        window.renderDownloads = function (entries) {
+
+            const list =
+                document.getElementById("list");
+
+            const empty =
+                document.getElementById("empty");
+
+            list.innerHTML = "";
+
+
+            if (!entries || entries.length === 0) {
+
+                empty.style.display = "block";
+
+                return;
+            }
+
+
+            empty.style.display = "none";
+
+
+            const groups = new Map();
+
+            for (const entry of entries) {
+
+                const day =
+                    formatDay(entry.startedAt);
+
+                if (!groups.has(day)) {
+
+                    groups.set(day, []);
+
+                }
+
+                groups.get(day).push(entry);
+
+            }
+
+
+            for (const [day, dayEntries] of groups) {
+
+                const groupElement =
+                    document.createElement("div");
+
+                groupElement.className = "day-group";
+
+
+                const label =
+                    document.createElement("div");
+
+                label.className = "day-label";
+
+                label.textContent = day;
+
+                groupElement.appendChild(label);
+
+
+                for (const entry of dayEntries) {
+
+                    const status =
+                        statusInfo(entry);
+
+
+                    const item =
+                        document.createElement("div");
+
+                    item.className = "entry";
+
+
+                    let actionsHTML = "";
+
+                    if (entry.state === "completed") {
+
+                        actionsHTML = `
+                            <a href="void://downloads/open/${entry.id}">Abrir</a>
+                            <a href="void://downloads/folder/${entry.id}">Pasta</a>
+                        `;
+
+                    } else if (entry.state === "progressing") {
+
+                        actionsHTML = `
+                            <a href="void://downloads/cancel/${entry.id}">Cancelar</a>
+                        `;
+
+                    }
+
+
+                    item.innerHTML = `
+                        <div class="entry-icon ${status.iconClass}">${status.icon}</div>
+                        <div class="entry-info">
+                            <div class="entry-title">${escapeHTML(entry.filename)}</div>
+                            <div class="entry-sub">${escapeHTML(status.text)}</div>
+                            ${
+                                status.percent !== null
+                                    ? `<div class="entry-progress"><div class="entry-progress-fill" style="width:${status.percent}%"></div></div>`
+                                    : ""
+                            }
+                        </div>
+                        <div class="entry-actions">${actionsHTML}</div>
+                    `;
+
+                    groupElement.appendChild(item);
+
+                }
+
+                list.appendChild(groupElement);
+
+            }
+
+        };
+
+    </script>
+
+</body>
+
+</html>

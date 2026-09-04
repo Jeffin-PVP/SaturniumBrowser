@@ -1,3 +1,5 @@
+const { session } = require("electron");
+
 const TabManager =
     require("./TabManager");
 
@@ -6,6 +8,12 @@ const NavigationManager =
 
 const HistoryManager =
     require("../history/HistoryManager");
+
+const DownloadManager =
+    require("../downloads/DownloadManager");
+
+const SearchManager =
+    require("../search/SearchManager");
 
 
 class BrowserManager {
@@ -20,6 +28,12 @@ class BrowserManager {
 
         this.history =
             new HistoryManager();
+
+        // =====================================
+        // MECANISMO DE BUSCA
+        // =====================================
+
+        this.search = new SearchManager();
 
         // =====================================
         // GERENCIADOR DE ABAS
@@ -42,10 +56,69 @@ class BrowserManager {
                         this.history.getAll(),
 
                     clearHistory: () =>
-                        this.history.clear()
+                        this.history.clear(),
+
+                    getDownloads: () =>
+                        this.downloads.getAll(),
+
+                    clearDownloads: () =>
+                        this.downloads.clear(),
+
+                    cancelDownload: (id) =>
+                        this.downloads.cancel(id),
+
+                    openDownloadFile: (id) =>
+                        this.downloads.openFile(id),
+
+                    showDownloadInFolder: (id) =>
+                        this.downloads.showInFolder(id),
+
+                    performSearch: (query) =>
+                        this.search.search(query)
 
                 }
             );
+
+        // =====================================
+        // GERENCIADOR DE DOWNLOADS
+        // =====================================
+
+        this.downloadsBarVisible = false;
+
+        this.downloads =
+            new DownloadManager({
+
+                onNewDownload: () => {
+
+                    this.downloadsBarVisible = true;
+
+                    this.tabManager.setDownloadsBarVisible(
+                        true
+                    );
+
+                    this.sendDownloadsUpdate();
+
+                },
+
+                onChange: () => {
+
+                    this.sendDownloadsUpdate();
+
+                }
+
+            });
+
+
+        session.defaultSession.on(
+            "will-download",
+            (event, item) => {
+
+                this.downloads.handleWillDownload(
+                    item
+                );
+
+            }
+        );
 
         // =====================================
         // GERENCIADOR DE NAVEGAÇÃO
@@ -246,6 +319,87 @@ class BrowserManager {
     openHistory() {
 
         this.tabManager.openHistory();
+
+    }
+
+
+    // =====================================
+    // FIXAR ABA / REABRIR ABA FECHADA
+    // =====================================
+
+    togglePinTab(id) {
+
+        this.tabManager.togglePin(id);
+
+    }
+
+
+    reopenClosedTab() {
+
+        this.tabManager.reopenClosedTab();
+
+    }
+
+
+    // =====================================
+    // DOWNLOADS
+    // =====================================
+
+    sendDownloadsUpdate() {
+
+        this.window.webContents.send(
+            "downloads-updated",
+            {
+
+                downloads:
+                    this.downloads.getAll(),
+
+                barVisible:
+                    this.downloadsBarVisible
+
+            }
+        );
+
+    }
+
+
+    openDownloads() {
+
+        this.tabManager.openDownloads();
+
+    }
+
+
+    closeDownloadsBar() {
+
+        this.downloadsBarVisible = false;
+
+        this.tabManager.setDownloadsBarVisible(
+            false
+        );
+
+        this.sendDownloadsUpdate();
+
+    }
+
+
+    cancelDownload(id) {
+
+        this.downloads.cancel(id);
+
+    }
+
+
+    openDownloadFile(id) {
+
+        this.downloads.openFile(id);
+
+    }
+
+
+    showDownloadInFolder(id) {
+
+        this.downloads.showInFolder(id);
 
     }
 

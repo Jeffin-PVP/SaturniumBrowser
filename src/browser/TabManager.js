@@ -27,6 +27,20 @@ const HISTORY_PAGE = path.join(
     "history.html"
 );
 
+const DOWNLOADS_PAGE = path.join(
+    __dirname,
+    "..",
+    "..",
+    "downloads.html"
+);
+
+const SEARCH_PAGE = path.join(
+    __dirname,
+    "..",
+    "..",
+    "search.html"
+);
+
 
 class TabManager {
 
@@ -59,11 +73,45 @@ class TabManager {
         this.onFaviconUpdate =
             callbacks.onFaviconUpdate || null;
 
+        this.getDownloads =
+            callbacks.getDownloads || null;
+
+        this.clearDownloads =
+            callbacks.clearDownloads || null;
+
+        this.cancelDownload =
+            callbacks.cancelDownload || null;
+
+        this.openDownloadFile =
+            callbacks.openDownloadFile || null;
+
+        this.showDownloadInFolder =
+            callbacks.showDownloadInFolder || null;
+
+        this.performSearch =
+            callbacks.performSearch || null;
+
         this.tabs = [];
 
         this.activeTabId = null;
 
         this.nextTabId = 1;
+
+        // =================================
+        // ABAS FECHADAS RECENTEMENTE
+        // (para "reabrir aba fechada")
+        // =================================
+
+        this.closedTabs = [];
+
+        this.maxClosedTabs = 15;
+
+        // =================================
+        // BARRA DE DOWNLOADS
+        // (afeta a altura da área de conteúdo)
+        // =================================
+
+        this.downloadsBarHeight = 0;
     }
 
 
@@ -105,7 +153,9 @@ class TabManager {
 
             favicon: null,
 
-            loading: false
+            loading: false,
+
+            pinned: false
 
         };
 
@@ -223,6 +273,25 @@ class TabManager {
 
 
                 // =================================
+                // CTRL + SHIFT + T
+                // REABRIR ABA FECHADA
+                // =================================
+
+                if (
+                    input.control &&
+                    input.shift &&
+                    input.key.toLowerCase() === "t"
+                ) {
+
+                    event.preventDefault();
+
+                    this.reopenClosedTab();
+
+                    return;
+                }
+
+
+                // =================================
                 // CTRL + TAB — PRÓXIMA ABA
                 // =================================
 
@@ -272,6 +341,24 @@ class TabManager {
                     event.preventDefault();
 
                     this.openHistory();
+
+                    return;
+                }
+
+
+                // =================================
+                // CTRL + J — DOWNLOADS
+                // =================================
+
+                if (
+                    input.control &&
+                    !input.shift &&
+                    input.key.toLowerCase() === "j"
+                ) {
+
+                    event.preventDefault();
+
+                    this.openDownloads();
 
                     return;
                 }
@@ -605,6 +692,34 @@ class TabManager {
             this.tabs[index];
 
 
+        // =================================
+        // GUARDAR PARA "REABRIR ABA FECHADA"
+        // (só páginas reais, não internas)
+        // =================================
+
+        if (!tab.internal) {
+
+            this.closedTabs.push({
+
+                url: tab.url,
+
+                pinned: tab.pinned
+
+            });
+
+
+            if (
+                this.closedTabs.length >
+                this.maxClosedTabs
+            ) {
+
+                this.closedTabs.shift();
+
+            }
+
+        }
+
+
         this.window.contentView.removeChildView(
             tab.view
         );
@@ -718,6 +833,91 @@ class TabManager {
 
 
     // =====================================
+    // FIXAR / DESAFIXAR ABA
+    // =====================================
+
+    togglePin(id) {
+
+        const tab =
+            this.tabs.find(
+                tab => tab.id === id
+            );
+
+
+        if (!tab) {
+
+            return;
+        }
+
+
+        tab.pinned = !tab.pinned;
+
+
+        // =================================
+        // REPOSICIONAR: abas fixadas sempre
+        // ficam no início, nessa ordem.
+        // =================================
+
+        const index =
+            this.tabs.indexOf(tab);
+
+        this.tabs.splice(index, 1);
+
+
+        let insertAt = 0;
+
+        while (
+            insertAt < this.tabs.length &&
+            this.tabs[insertAt].pinned
+        ) {
+
+            insertAt++;
+
+        }
+
+
+        this.tabs.splice(
+            insertAt,
+            0,
+            tab
+        );
+
+
+        this.sendTabs();
+
+    }
+
+
+    // =====================================
+    // REABRIR ÚLTIMA ABA FECHADA
+    // =====================================
+
+    reopenClosedTab() {
+
+        if (this.closedTabs.length === 0) {
+
+            return;
+        }
+
+
+        const entry =
+            this.closedTabs.pop();
+
+
+        const tab =
+            this.createTab(entry.url);
+
+
+        if (entry.pinned) {
+
+            this.togglePin(tab.id);
+
+        }
+
+    }
+
+
+    // =====================================
     // ABA ATIVA
     // =====================================
 
@@ -736,7 +936,7 @@ class TabManager {
     // PÁGINAS INTERNAS
     // =====================================
 
-    openInternalPage(page) {
+    openInternalPage(page, options = {}) {
 
         const tab =
             this.getActiveTab();
@@ -814,6 +1014,127 @@ class TabManager {
             return;
         }
 
+        if (page === "downloads") {
+
+            tab.internal = true;
+
+            tab.url = "void://downloads";
+
+            tab.title =
+                "Downloads - VoidBrowser";
+
+
+            tab.view.webContents.loadFile(
+                DOWNLOADS_PAGE
+            );
+
+
+            tab.view.webContents.once(
+                "did-finish-load",
+                () => {
+
+                    const entries =
+                        typeof this.getDownloads === "function"
+                            ? this.getDownloads()
+                            : [];
+
+                    tab.view.webContents.executeJavaScript(
+                        `window.renderDownloads(${JSON.stringify(entries)})`
+                    ).catch(() => {});
+
+                }
+            );
+
+
+            this.sendTabUpdate(tab);
+
+            this.sendTabs();
+
+            return;
+        }
+
+
+        if (page === "search") {
+
+            const query =
+                options.query || "";
+
+
+            tab.internal = true;
+
+            tab.url =
+                "void://search?q=" +
+                encodeURIComponent(query);
+
+            tab.title =
+                query
+                    ? `${query} - Busca VoidBrowser`
+                    : "Busca - VoidBrowser";
+
+
+            tab.view.webContents.loadFile(
+                SEARCH_PAGE
+            );
+
+
+            tab.view.webContents.once(
+                "did-finish-load",
+                async () => {
+
+                    // Mostra o estado de
+                    // carregamento imediatamente
+                    tab.view.webContents.executeJavaScript(
+                        `window.renderSearchLoading(${JSON.stringify(query)})`
+                    ).catch(() => {});
+
+
+                    let results = [];
+
+                    let error = null;
+
+
+                    try {
+
+                        results =
+                            typeof this.performSearch === "function"
+                                ? await this.performSearch(query)
+                                : [];
+
+                    } catch (searchError) {
+
+                        error =
+                            "Não foi possível buscar agora. Verifique sua conexão e tente novamente.";
+
+                    }
+
+
+                    // A aba pode ter navegado
+                    // para outro lugar enquanto
+                    // a busca acontecia.
+                    if (
+                        tab.url !==
+                        "void://search?q=" + encodeURIComponent(query)
+                    ) {
+
+                        return;
+                    }
+
+
+                    tab.view.webContents.executeJavaScript(
+                        `window.renderSearchResults(${JSON.stringify({ query, results, error })})`
+                    ).catch(() => {});
+
+                }
+            );
+
+
+            this.sendTabUpdate(tab);
+
+            this.sendTabs();
+
+            return;
+        }
+
     }
 
 
@@ -827,6 +1148,21 @@ class TabManager {
 
         this.openInternalPage(
             "history"
+        );
+
+    }
+
+
+    // =====================================
+    // ABRIR DOWNLOADS EM NOVA ABA
+    // =====================================
+
+    openDownloads() {
+
+        this.createTab();
+
+        this.openInternalPage(
+            "downloads"
         );
 
     }
@@ -865,6 +1201,42 @@ class TabManager {
         if (
             /^void:\/\//i.test(value)
         ) {
+
+            // =============================
+            // BUSCA (usa query string, ex:
+            // void://search?q=algo)
+            // =============================
+
+            if (
+                /^void:\/\/search/i.test(value)
+            ) {
+
+                let query = "";
+
+                try {
+
+                    const parsedSearch =
+                        new URL(value);
+
+                    query =
+                        parsedSearch.searchParams.get("q") ||
+                        "";
+
+                } catch (error) {
+
+                    query = "";
+
+                }
+
+
+                this.openInternalPage(
+                    "search",
+                    { query }
+                );
+
+                return;
+            }
+
 
             const parts =
                 value
@@ -911,6 +1283,57 @@ class TabManager {
 
                 this.openInternalPage(
                     "history"
+                );
+
+                return;
+            }
+
+
+            if (page === "downloads") {
+
+                const downloadId =
+                    Number(parts[2]);
+
+
+                if (
+                    action === "clear" &&
+                    typeof this.clearDownloads === "function"
+                ) {
+
+                    this.clearDownloads();
+
+                } else if (
+                    action === "cancel" &&
+                    typeof this.cancelDownload === "function"
+                ) {
+
+                    this.cancelDownload(
+                        downloadId
+                    );
+
+                } else if (
+                    action === "open" &&
+                    typeof this.openDownloadFile === "function"
+                ) {
+
+                    this.openDownloadFile(
+                        downloadId
+                    );
+
+                } else if (
+                    action === "folder" &&
+                    typeof this.showDownloadInFolder === "function"
+                ) {
+
+                    this.showDownloadInFolder(
+                        downloadId
+                    );
+
+                }
+
+
+                this.openInternalPage(
+                    "downloads"
                 );
 
                 return;
@@ -1019,19 +1442,13 @@ class TabManager {
 
 
         // =================================
-        // PESQUISA
+        // PESQUISA (mecanismo próprio do
+        // VoidBrowser — não depende do Google)
         // =================================
 
-        const searchURL =
-            "https://www.google.com/search?q=" +
-            encodeURIComponent(value);
-
-
-        tab.url = searchURL;
-
-
-        tab.view.webContents.loadURL(
-            searchURL
+        this.openInternalPage(
+            "search",
+            { query: value }
         );
 
     }
@@ -1120,6 +1537,9 @@ class TabManager {
 
         const top = 142;
 
+        const bottom =
+            this.downloadsBarHeight || 0;
+
 
         for (
             const tab of this.tabs
@@ -1136,12 +1556,28 @@ class TabManager {
                 height:
                     Math.max(
                         0,
-                        bounds.height - top
+                        bounds.height - top - bottom
                     )
 
             });
 
         }
+
+    }
+
+
+    // =====================================
+    // MOSTRAR/ESCONDER BARRA DE DOWNLOADS
+    // =====================================
+
+    setDownloadsBarVisible(visible) {
+
+        // Precisa bater com a altura definida
+        // em style.css (.downloads-bar)
+        this.downloadsBarHeight =
+            visible ? 52 : 0;
+
+        this.updateBounds();
 
     }
 
@@ -1189,7 +1625,9 @@ class TabManager {
 
                     favicon: tab.favicon,
 
-                    loading: tab.loading
+                    loading: tab.loading,
+
+                    pinned: tab.pinned
 
                 }))
 

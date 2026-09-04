@@ -105,6 +105,16 @@ contextBridge.exposeInMainWorld(
 
 
         // ==========================================
+        // MENU PRINCIPAL (TRÊS PONTINHOS)
+        // ==========================================
+
+        showMainMenu: () =>
+            ipcRenderer.send(
+                "main-menu-open"
+            ),
+
+
+        // ==========================================
         // HISTÓRICO
         // ==========================================
 
@@ -112,6 +122,81 @@ contextBridge.exposeInMainWorld(
             ipcRenderer.send(
                 "history-open"
             ),
+
+
+        // ==========================================
+        // FIXAR ABA / REABRIR ABA FECHADA
+        // ==========================================
+
+        togglePinTab: (id) =>
+            ipcRenderer.send(
+                "tab-toggle-pin",
+                id
+            ),
+
+
+        reopenClosedTab: () =>
+            ipcRenderer.send(
+                "tab-reopen-closed"
+            ),
+
+
+        showTabContextMenu: (payload) =>
+            ipcRenderer.send(
+                "tab-context-menu",
+                payload
+            ),
+
+
+        // ==========================================
+        // DOWNLOADS
+        // ==========================================
+
+        openDownloads: () =>
+            ipcRenderer.send(
+                "downloads-open"
+            ),
+
+
+        closeDownloadsBar: () =>
+            ipcRenderer.send(
+                "downloads-bar-close"
+            ),
+
+
+        cancelDownload: (id) =>
+            ipcRenderer.send(
+                "downloads-cancel",
+                id
+            ),
+
+
+        openDownloadFile: (id) =>
+            ipcRenderer.send(
+                "downloads-open-file",
+                id
+            ),
+
+
+        showDownloadInFolder: (id) =>
+            ipcRenderer.send(
+                "downloads-show-in-folder",
+                id
+            ),
+
+
+        onDownloadsUpdated: (callback) => {
+
+            ipcRenderer.on(
+                "downloads-updated",
+                (event, data) => {
+
+                    callback(data);
+
+                }
+            );
+
+        },
 
 
         // ==========================================

@@ -85,14 +85,15 @@ class URLUtils {
         }
 
 
-        // Pesquisa
+        // Pesquisa (mecanismo próprio do
+        // VoidBrowser, não depende do Google)
 
         return {
             type: "search",
             query: value,
 
             url:
-                "https://www.google.com/search?q=" +
+                "void://search?q=" +
                 encodeURIComponent(value)
         };
 

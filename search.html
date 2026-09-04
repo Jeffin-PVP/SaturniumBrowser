@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Busca - VoidBrowser</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            width: 100vw;
+            height: 100vh;
+
+            overflow-y: auto;
+
+            font-family: Arial, sans-serif;
+
+            color: white;
+
+            background:
+                radial-gradient(
+                    circle at 50% 0%,
+                    #151b35 0%,
+                    #090c18 35%,
+                    #05060b 70%
+                );
+        }
+
+
+        .container {
+            max-width: 700px;
+
+            margin: 0 auto;
+
+            padding: 36px 24px 60px;
+        }
+
+
+        .search-form {
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
+
+            padding: 4px 4px 4px 18px;
+
+            border-radius: 26px;
+
+            background: #101423;
+
+            border: 1px solid #262c40;
+
+            margin-bottom: 8px;
+        }
+
+
+        .search-form:focus-within {
+            border-color: #695cff;
+        }
+
+
+        .search-form input {
+            flex: 1;
+
+            border: none;
+
+            background: transparent;
+
+            color: white;
+
+            font-size: 15px;
+
+            padding: 12px 0;
+
+            outline: none;
+        }
+
+
+        .search-form button {
+            flex-shrink: 0;
+
+            width: 40px;
+            height: 40px;
+
+            border: none;
+            border-radius: 50%;
+
+            background: #7c5cff;
+
+            color: white;
+
+            font-size: 15px;
+
+            cursor: pointer;
+        }
+
+
+        .search-form button:hover {
+            background: #8d70ff;
+        }
+
+
+        .meta-line {
+            margin: 0 0 26px 6px;
+
+            font-size: 12px;
+
+            color: #656b80;
+        }
+
+
+        .state-box {
+            margin-top: 60px;
+
+            text-align: center;
+
+            color: #7d849c;
+
+            font-size: 14px;
+        }
+
+
+        .result {
+            padding: 16px 6px;
+
+            border-bottom: 1px solid #1c2135;
+        }
+
+
+        .result-domain-row {
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            margin-bottom: 4px;
+        }
+
+
+        .result-favicon {
+            width: 16px;
+            height: 16px;
+
+            border-radius: 3px;
+
+            object-fit: contain;
+        }
+
+
+        .result-domain {
+            font-size: 12px;
+
+            color: #7fe0a8;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        .result-title {
+            display: block;
+
+            font-size: 17px;
+
+            color: #b9c2ff;
+
+            text-decoration: none;
+
+            margin-bottom: 4px;
+        }
+
+
+        .result-title:hover {
+            text-decoration: underline;
+        }
+
+
+        .result-snippet {
+            font-size: 13px;
+
+            line-height: 1.5;
+
+            color: #a7adc0;
+        }
+
+
+        .footer-note {
+            margin-top: 40px;
+
+            text-align: center;
+
+            font-size: 11px;
+
+            color: #454b5e;
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <form id="search-form" class="search-form">
+
+            <input
+                id="search-input"
+                type="text"
+                placeholder="Pesquisar na web..."
+                autocomplete="off"
+            >
+
+            <button type="submit">🔍</button>
+
+        </form>
+
+
+        <div id="meta-line" class="meta-line"></div>
+
+
+        <div id="state-box" class="state-box" style="display: none;"></div>
+
+
+        <div id="results"></div>
+
+
+        <div class="footer-note">
+            Busca privada do VoidBrowser — sem perfil, sem rastreamento.
+        </div>
+
+    </div>
+
+
+    <script>
+
+        const form =
+            document.getElementById("search-form");
+
+        const input =
+            document.getElementById("search-input");
+
+        const metaLine =
+            document.getElementById("meta-line");
+
+        const stateBox =
+            document.getElementById("state-box");
+
+        const resultsContainer =
+            document.getElementById("results");
+
+
+        // Preenche a busca atual a partir da URL
+        // (void://search?q=...)
+        try {
+
+            const params =
+                new URLSearchParams(
+                    window.location.search
+                );
+
+            const currentQuery =
+                params.get("q") || "";
+
+            input.value = currentQuery;
+
+        } catch (error) {}
+
+
+        form.addEventListener(
+            "submit",
+            (event) => {
+
+                event.preventDefault();
+
+
+                const value =
+                    input.value.trim();
+
+
+                if (!value) {
+
+                    return;
+                }
+
+
+                window.location.href =
+                    "void://search?q=" +
+                    encodeURIComponent(value);
+
+            }
+        );
+
+
+        function escapeHTML(value) {
+
+            const div = document.createElement("div");
+
+            div.textContent = value || "";
+
+            return div.innerHTML;
+
+        }
+
+
+        function domainFromUrl(url) {
+
+            try {
+
+                return new URL(url).hostname;
+
+            } catch (error) {
+
+                return url;
+
+            }
+
+        }
+
+
+        // ==========================================
+        // ESTADO: CARREGANDO
+        // ==========================================
+
+        window.renderSearchLoading = function (query) {
+
+            metaLine.textContent =
+                query
+                    ? `Buscando por "${query}"...`
+                    : "";
+
+            resultsContainer.innerHTML = "";
+
+            stateBox.style.display = "block";
+
+            stateBox.textContent = "Buscando...";
+
+        };
+
+
+        // ==========================================
+        // ESTADO: RESULTADOS PRONTOS
+        // ==========================================
+
+        window.renderSearchResults = function (data) {
+
+            const { query, results, error } =
+                data || {};
+
+            resultsContainer.innerHTML = "";
+
+
+            if (!query) {
+
+                metaLine.textContent = "";
+
+                stateBox.style.display = "block";
+
+                stateBox.textContent =
+                    "Digite algo para buscar.";
+
+                return;
+            }
+
+
+            if (error) {
+
+                metaLine.textContent =
+                    `Busca por "${query}"`;
+
+                stateBox.style.display = "block";
+
+                stateBox.textContent = error;
+
+                return;
+            }
+
+
+            if (!results || results.length === 0) {
+
+                metaLine.textContent =
+                    `Busca por "${query}"`;
+
+                stateBox.style.display = "block";
+
+                stateBox.textContent =
+                    "Nenhum resultado encontrado.";
+
+                return;
+            }
+
+
+            stateBox.style.display = "none";
+
+            metaLine.textContent =
+                `${results.length} resultados para "${query}"`;
+
+
+            for (const item of results) {
+
+                const domain =
+                    domainFromUrl(item.url);
+
+
+                const entry =
+                    document.createElement("div");
+
+                entry.className = "result";
+
+
+                entry.innerHTML = `
+                    <div class="result-domain-row">
+                        <img
+                            class="result-favicon"
+                            src="https://icons.duckduckgo.com/ip3/${escapeHTML(domain)}.ico"
+                            onerror="this.style.display='none';"
+                        >
+                        <span class="result-domain">${escapeHTML(domain)}</span>
+                    </div>
+                    <a class="result-title" href="${escapeHTML(item.url)}">
+                        ${escapeHTML(item.title)}
+                    </a>
+                    <div class="result-snippet">${escapeHTML(item.snippet)}</div>
+                `;
+
+                resultsContainer.appendChild(entry);
+
+            }
+
+        };
+
+    </script>
+
+</body>
+
+</html>

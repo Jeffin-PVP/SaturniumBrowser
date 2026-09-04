@@ -28,53 +28,30 @@ const closeButton =
 const menuButton =
     document.getElementById("menu");
 
-const menuDropdown =
-    document.getElementById("menu-dropdown");
+const downloadsBar =
+    document.getElementById("downloads-bar");
 
-const menuHistoryItem =
-    document.getElementById("menu-history");
+const downloadsBarList =
+    document.getElementById("downloads-bar-list");
+
+const downloadsBarCloseButton =
+    document.getElementById("downloads-bar-close");
+
+const downloadsBarOpenAllButton =
+    document.getElementById("downloads-bar-open-all");
 
 
 // =====================================
 // MENU (TRÊS PONTINHOS)
+// Usa o menu nativo do sistema operacional,
+// para não ficar cortado pela área da aba.
 // =====================================
 
 menuButton.addEventListener(
     "click",
-    (event) => {
-
-        event.stopPropagation();
-
-        menuDropdown.classList.toggle(
-            "open"
-        );
-
-    }
-);
-
-
-menuHistoryItem.addEventListener(
-    "click",
     () => {
 
-        window.browserAPI.openHistory();
-
-        menuDropdown.classList.remove(
-            "open"
-        );
-
-    }
-);
-
-
-// Fecha o menu ao clicar fora dele
-document.addEventListener(
-    "click",
-    () => {
-
-        menuDropdown.classList.remove(
-            "open"
-        );
+        window.browserAPI.showMainMenu();
 
     }
 );
@@ -258,6 +235,15 @@ function renderTabs(data) {
         }
 
 
+        if (tab.pinned) {
+
+            tabElement.classList.add(
+                "pinned"
+            );
+
+        }
+
+
         // =================================
         // FAVICON
         // =================================
@@ -331,6 +317,30 @@ function renderTabs(data) {
 
                 window.browserAPI
                     .activateTab(tab.id);
+
+            }
+        );
+
+
+        // =================================
+        // MENU DE CONTEXTO (CLIQUE DIREITO)
+        // =================================
+
+        tabElement.addEventListener(
+            "contextmenu",
+            (event) => {
+
+                event.preventDefault();
+
+                window.browserAPI
+                    .showTabContextMenu({
+
+                        id: tab.id,
+
+                        pinned:
+                            !!tab.pinned
+
+                    });
 
             }
         );
@@ -468,6 +478,254 @@ function updateLoading(
     }
 
 }
+
+
+// =====================================
+// BARRA DE DOWNLOADS
+// =====================================
+
+function formatBytes(bytes) {
+
+    if (!bytes || bytes <= 0) {
+        return "0 KB";
+    }
+
+    const units = ["B", "KB", "MB", "GB"];
+
+    let value = bytes;
+
+    let i = 0;
+
+    while (
+        value >= 1024 &&
+        i < units.length - 1
+    ) {
+
+        value /= 1024;
+
+        i++;
+
+    }
+
+    return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+
+}
+
+
+function downloadStatusText(entry) {
+
+    if (entry.state === "progressing") {
+
+        const percent =
+            entry.totalBytes > 0
+                ? Math.round(
+                    (entry.receivedBytes / entry.totalBytes) * 100
+                )
+                : null;
+
+        return percent !== null
+            ? `${percent}% de ${formatBytes(entry.totalBytes)}`
+            : formatBytes(entry.receivedBytes);
+
+    }
+
+    if (entry.state === "completed") {
+
+        return `Concluído • ${formatBytes(entry.totalBytes)}`;
+
+    }
+
+    if (entry.state === "cancelled") {
+
+        return "Cancelado";
+
+    }
+
+    return "Interrompido";
+
+}
+
+
+function downloadIcon(entry) {
+
+    if (entry.state === "progressing") {
+        return "⬇";
+    }
+
+    if (entry.state === "completed") {
+        return "✓";
+    }
+
+    return "✕";
+
+}
+
+
+function renderDownloadsBar(data) {
+
+    const downloads =
+        data.downloads || [];
+
+    downloadsBarList.innerHTML = "";
+
+
+    // Mostra só os mais recentes na barrinha
+    const recent =
+        downloads.slice(0, 6);
+
+    for (const entry of recent) {
+
+        const chip =
+            document.createElement("div");
+
+        chip.className =
+            "download-chip";
+
+
+        const icon =
+            document.createElement("span");
+
+        icon.className =
+            "download-chip-icon";
+
+        icon.textContent =
+            downloadIcon(entry);
+
+
+        const info =
+            document.createElement("div");
+
+        info.className =
+            "download-chip-info";
+
+
+        const name =
+            document.createElement("div");
+
+        name.className =
+            "download-chip-name";
+
+        name.textContent =
+            entry.filename || "arquivo";
+
+        name.title =
+            entry.filename || "";
+
+
+        const sub =
+            document.createElement("div");
+
+        sub.className =
+            "download-chip-sub";
+
+        sub.textContent =
+            downloadStatusText(entry);
+
+
+        info.appendChild(name);
+        info.appendChild(sub);
+
+        chip.appendChild(icon);
+        chip.appendChild(info);
+
+
+        if (entry.state === "progressing") {
+
+            const cancel =
+                document.createElement("button");
+
+            cancel.className =
+                "download-chip-cancel";
+
+            cancel.type = "button";
+
+            cancel.textContent = "×";
+
+            cancel.title = "Cancelar";
+
+            cancel.addEventListener(
+                "click",
+                (event) => {
+
+                    event.stopPropagation();
+
+                    window.browserAPI
+                        .cancelDownload(entry.id);
+
+                }
+            );
+
+            chip.appendChild(cancel);
+
+        }
+
+
+        chip.addEventListener(
+            "click",
+            () => {
+
+                if (entry.state === "completed") {
+
+                    window.browserAPI
+                        .openDownloadFile(entry.id);
+
+                }
+
+            }
+        );
+
+
+        downloadsBarList.appendChild(
+            chip
+        );
+
+    }
+
+
+    if (data.barVisible) {
+
+        downloadsBar.classList.add(
+            "visible"
+        );
+
+    } else {
+
+        downloadsBar.classList.remove(
+            "visible"
+        );
+
+    }
+
+}
+
+
+downloadsBarCloseButton.addEventListener(
+    "click",
+    () => {
+
+        window.browserAPI.closeDownloadsBar();
+
+    }
+);
+
+
+downloadsBarOpenAllButton.addEventListener(
+    "click",
+    () => {
+
+        window.browserAPI.openDownloads();
+
+    }
+);
+
+
+window.browserAPI.onDownloadsUpdated(
+    (data) => {
+
+        renderDownloadsBar(data);
+
+    }
+);
 
 
 // =====================================
