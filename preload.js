@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld(
     "browserAPI",
     {
 
-
         // ==========================================
         // NAVEGAÇÃO
         // ==========================================
@@ -44,19 +43,19 @@ contextBridge.exposeInMainWorld(
             ),
 
 
-        minimizeWindow: () => 
+        minimizeWindow: () =>
             ipcRenderer.send(
                 "window-minimize"
             ),
 
 
-        maximizeWindow: () => 
+        maximizeWindow: () =>
             ipcRenderer.send(
                 "window-maximize"
             ),
 
-            
-        closeWindow: () => 
+
+        closeWindow: () =>
             ipcRenderer.send(
                 "window-close"
             ),
@@ -268,8 +267,87 @@ contextBridge.exposeInMainWorld(
                 }
             );
 
-        }
+        },
 
+
+        // ==========================================
+        // ATUALIZAÇÕES
+        // ==========================================
+
+        update: {
+
+            onChecking: (callback) =>
+                ipcRenderer.on(
+                    "update-checking",
+                    () => {
+
+                        callback();
+
+                    }
+                ),
+
+
+            onAvailable: (callback) =>
+                ipcRenderer.on(
+                    "update-available",
+                    (event, data) => {
+
+                        callback(data);
+
+                    }
+                ),
+
+
+            onNotAvailable: (callback) =>
+                ipcRenderer.on(
+                    "update-not-available",
+                    (event, data) => {
+
+                        callback(data);
+
+                    }
+                ),
+
+
+            onProgress: (callback) =>
+                ipcRenderer.on(
+                    "update-progress",
+                    (event, data) => {
+
+                        callback(data);
+
+                    }
+                ),
+
+
+            onDownloaded: (callback) =>
+                ipcRenderer.on(
+                    "update-downloaded",
+                    (event, data) => {
+
+                        callback(data);
+
+                    }
+                ),
+
+
+            onError: (callback) =>
+                ipcRenderer.on(
+                    "update-error",
+                    (event, data) => {
+
+                        callback(data);
+
+                    }
+                ),
+
+
+            install: () =>
+                ipcRenderer.send(
+                    "update-install"
+                )
+
+        }
 
     }
 

@@ -11,11 +11,14 @@ const path =
 const BrowserManager =
     require("./src/browser/BrowserManager");
 
+const UpdateManager =
+    require("./src/updater/UpdateManager");
 
 let win;
 
 let browserManager;
 
+let updateManager;
 
 // ==========================================
 // CRIAR JANELA
@@ -88,6 +91,11 @@ function createWindow() {
         }
     );
 
+    updateManager = new UpdateManager(win);
+
+    setTimeout(() => {
+        updateManager.checkForUpdates();
+    }, 5000);
 
     // ======================================
     // REDIMENSIONAMENTO
@@ -365,6 +373,19 @@ ipcMain.on(
     }
 );
 
+
+// ==========================================
+// ATUALIZAÇÕES
+// ==========================================
+
+
+ipcMain.on("update-install", () => {
+
+    if (!updateManager) return;
+
+    updateManager.installUpdate();
+
+});
 
 // ==========================================
 // VOLTAR
