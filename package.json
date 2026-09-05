@@ -1,7 +1,7 @@
 {
-  "name": "VoidBrowser",
-  "version": "1.0.5",
-  "description": "Meu navegador personalizado",
+  "name": "saturniumbrowser",
+  "version": "1.0.7",
+  "description": "Navegador personalizado SaturniumBrowser",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,45 +15,34 @@
     "electron": "^44.1.0",
     "electron-builder": "^26.15.3"
   },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
   "build": {
-    "appId": "com.voidbrowser.browser",
-    "productName": "VoidBrowser",
+    "appId": "com.saturnium.browser",
+    "productName": "SaturniumBrowser",
     "directories": {
       "output": "dist"
     },
     "files": [
       "**/*"
     ],
+    "icon": "assets/saturniumbrowser.ico",
     "win": {
       "target": "nsis",
-      "icon": "assets/voidbrowser.ico"
+      "icon": "assets/saturniumbrowser.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "VoidBrowser"
-    }
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.9"
-  },
-  "build": {
-    "appId": "com.voidbrowser.app",
-    "productName": "VoidBrowser",
-    "icon": "assets/voidbrowser.ico",
-    "win": {
-      "target": "nsis"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "shortcutName": "SaturniumBrowser"
     },
     "publish": {
       "provider": "github",
       "owner": "Jeffin-PVP",
-      "repo": "VoidBrowser"
+      "repo": "SaturniumBrowser"
     }
   }
 }

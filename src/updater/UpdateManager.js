@@ -1,5 +1,7 @@
-const { autoUpdater } =
-    require("electron-updater");
+const { app } = require("electron");
+const { autoUpdater } = require("electron-updater");
+const fs = require("fs");
+const path = require("path");
 
 
 class UpdateManager {
@@ -8,11 +10,96 @@ class UpdateManager {
 
         this.window = window;
 
+        this.isChecking = false;
+        this.updateAvailable = false;
+        this.updateDownloaded = false;
+        this.availableVersion = null;
+        this.lastError = null;
+
+        this.logDirectory = app.getPath("userData");
+        this.logFile = path.join(
+            this.logDirectory,
+            "updater.log"
+        );
+
+        // Baixa automaticamente quando uma nova versão é encontrada.
         autoUpdater.autoDownload = true;
 
+        // A instalação será iniciada somente quando o usuário clicar
+        // em "Reiniciar e atualizar".
         autoUpdater.autoInstallEvent = "manual";
 
+        this.setupLogger();
         this.setupEvents();
+
+        this.log(
+            "INFO",
+            `UpdateManager iniciado. Versão atual: ${app.getVersion()}`
+        );
+
+    }
+
+
+    // =====================================
+    // LOG
+    // =====================================
+
+    setupLogger() {
+
+        try {
+
+            if (!fs.existsSync(this.logDirectory)) {
+                fs.mkdirSync(
+                    this.logDirectory,
+                    { recursive: true }
+                );
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[Updater] Não foi possível preparar o diretório de log:",
+                error
+            );
+
+        }
+
+    }
+
+
+    log(level, message, error = null) {
+
+        const timestamp =
+            new Date().toISOString();
+
+        let line =
+            `[${timestamp}] [${level}] ${message}`;
+
+        if (error) {
+
+            line +=
+                ` | ${error.message || error}`;
+
+        }
+
+        console.log(line);
+
+        try {
+
+            fs.appendFileSync(
+                this.logFile,
+                line + "\n",
+                "utf8"
+            );
+
+        } catch (logError) {
+
+            console.error(
+                "[Updater] Falha ao gravar updater.log:",
+                logError
+            );
+
+        }
 
     }
 
@@ -27,8 +114,12 @@ class UpdateManager {
             "checking-for-update",
             () => {
 
-                console.log(
-                    "[Updater] Verificando atualizações..."
+                this.isChecking = true;
+                this.lastError = null;
+
+                this.log(
+                    "INFO",
+                    "Verificando atualizações..."
                 );
 
                 this.send(
@@ -43,16 +134,23 @@ class UpdateManager {
             "update-available",
             (info) => {
 
-                console.log(
-                    "[Updater] Atualização disponível:",
-                    info.version
+                this.isChecking = false;
+                this.updateAvailable = true;
+                this.updateDownloaded = false;
+                this.availableVersion =
+                    info.version || null;
+                this.lastError = null;
+
+                this.log(
+                    "INFO",
+                    `Atualização disponível: ${info.version}`
                 );
 
                 this.send(
                     "update-available",
                     {
-                        version:
-                            info.version
+                        version: info.version,
+                        releaseName: info.releaseName || null
                     }
                 );
 
@@ -64,15 +162,22 @@ class UpdateManager {
             "update-not-available",
             (info) => {
 
-                console.log(
-                    "[Updater] VoidBrowser já está atualizado."
+                this.isChecking = false;
+                this.updateAvailable = false;
+                this.updateDownloaded = false;
+                this.availableVersion = null;
+                this.lastError = null;
+
+                this.log(
+                    "INFO",
+                    `SaturniumBrowser já está atualizado. Versão: ${info.version || app.getVersion()}`
                 );
 
                 this.send(
                     "update-not-available",
                     {
                         version:
-                            info.version
+                            info.version || app.getVersion()
                     }
                 );
 
@@ -83,6 +188,11 @@ class UpdateManager {
         autoUpdater.on(
             "download-progress",
             (progress) => {
+
+                this.log(
+                    "INFO",
+                    `Baixando atualização: ${progress.percent.toFixed(1)}%`
+                );
 
                 this.send(
                     "update-progress",
@@ -109,9 +219,16 @@ class UpdateManager {
             "update-downloaded",
             (info) => {
 
-                console.log(
-                    "[Updater] Atualização baixada:",
-                    info.version
+                this.isChecking = false;
+                this.updateAvailable = true;
+                this.updateDownloaded = true;
+                this.availableVersion =
+                    info.version || this.availableVersion;
+                this.lastError = null;
+
+                this.log(
+                    "INFO",
+                    `Atualização baixada: ${info.version}`
                 );
 
                 this.send(
@@ -130,8 +247,15 @@ class UpdateManager {
             "error",
             (error) => {
 
-                console.error(
-                    "[Updater] Erro:",
+                this.isChecking = false;
+                this.lastError =
+                    error && error.message
+                        ? error.message
+                        : String(error);
+
+                this.log(
+                    "ERROR",
+                    "Erro durante a atualização",
                     error
                 );
 
@@ -139,7 +263,7 @@ class UpdateManager {
                     "update-error",
                     {
                         message:
-                            error.message
+                            this.lastError
                     }
                 );
 
@@ -159,6 +283,10 @@ class UpdateManager {
             return;
         }
 
+        if (this.window.isDestroyed()) {
+            return;
+        }
+
         this.window.webContents.send(
             channel,
             data
@@ -171,19 +299,66 @@ class UpdateManager {
     // VERIFICAR ATUALIZAÇÃO
     // =====================================
 
-    checkForUpdates() {
+    async checkForUpdates() {
 
         if (!this.isPackaged()) {
 
-            console.log(
-                "[Updater] Aplicativo não empacotado. Verificação ignorada."
+            this.log(
+                "INFO",
+                "Aplicativo não empacotado. Verificação ignorada."
             );
 
-            return;
+            return null;
 
         }
 
-        autoUpdater.checkForUpdates();
+        if (this.isChecking) {
+
+            this.log(
+                "INFO",
+                "Uma verificação já está em andamento."
+            );
+
+            return null;
+
+        }
+
+        try {
+
+            this.isChecking = true;
+
+            this.log(
+                "INFO",
+                `Iniciando verificação. Plataforma: ${process.platform}, arquitetura: ${process.arch}`
+            );
+
+            return await autoUpdater.checkForUpdates();
+
+        } catch (error) {
+
+            this.isChecking = false;
+            this.lastError =
+                error && error.message
+                    ? error.message
+                    : String(error);
+
+            this.log(
+                "ERROR",
+                "checkForUpdates() falhou",
+                error
+            );
+
+            this.send(
+                "update-error",
+                {
+                    message:
+                        this.lastError
+                }
+            );
+
+            return null;
+
+        }
 
     }
 
@@ -194,7 +369,57 @@ class UpdateManager {
 
     installUpdate() {
 
+        if (!this.updateDownloaded) {
+
+            this.log(
+                "WARN",
+                "Tentativa de instalar atualização antes do download terminar."
+            );
+
+            return false;
+
+        }
+
+        this.log(
+            "INFO",
+            `Instalando atualização ${this.availableVersion || "desconhecida"}...`
+        );
+
         autoUpdater.quitAndInstall();
+
+        return true;
+
+    }
+
+
+    // =====================================
+    // STATUS
+    // =====================================
+
+    getStatus() {
+
+        return {
+            currentVersion:
+                app.getVersion(),
+
+            isPackaged:
+                this.isPackaged(),
+
+            isChecking:
+                this.isChecking,
+
+            updateAvailable:
+                this.updateAvailable,
+
+            updateDownloaded:
+                this.updateDownloaded,
+
+            availableVersion:
+                this.availableVersion,
+
+            lastError:
+                this.lastError
+        };
 
     }
 
@@ -204,10 +429,6 @@ class UpdateManager {
     // =====================================
 
     isPackaged() {
-
-        const {
-            app
-        } = require("electron");
 
         return app.isPackaged;
 

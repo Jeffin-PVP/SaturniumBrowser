@@ -2,11 +2,15 @@ const {
     app,
     BrowserWindow,
     ipcMain,
-    Menu
+    Menu,
+    protocol,
+    net
 } = require("electron");
 
 const path =
     require("path");
+
+const { pathToFileURL } = require("url");
 
 const BrowserManager =
     require("./src/browser/BrowserManager");
@@ -39,7 +43,7 @@ function createWindow() {
         icon: path.join(
             __dirname,
             "assets",
-            "voidbrowser.ico"
+            "saturniumbrowser.ico"
         ),
 
         webPreferences: {
@@ -377,6 +381,14 @@ ipcMain.on(
 // ==========================================
 // ATUALIZAÇÕES
 // ==========================================
+
+ipcMain.on("update-check", () => {
+
+    if (!updateManager) return;
+
+    updateManager.checkForUpdates();
+
+});
 
 
 ipcMain.on("update-install", () => {
@@ -901,16 +913,76 @@ ipcMain.on(
 
     }
 );
+// ==========================================
+// SATURNIUM PROTOCOL
+// ==========================================
 
+protocol.registerSchemesAsPrivileged([
+    {
+        scheme: "saturnium",
+        privileges: {
+            standard: true,
+            secure: true,
+            supportFetchAPI: true,
+            corsEnabled: true
+        }
+    }
+]);
 
 // ==========================================
 // ELECTRON READY
 // ==========================================
 
-app.whenReady().then(
-    createWindow
-);
+app.whenReady().then(async () => {
 
+    // Registrar protocolo interno Saturnium
+    protocol.handle("saturnium", async (request) => {
+
+        const url = new URL(request.url);
+
+        let file;
+
+        switch (url.hostname) {
+
+            case "newtab":
+                file = "newtab.html";
+                break;
+
+            case "history":
+                file = "history.html";
+                break;
+
+            case "downloads":
+                file = "downloads.html";
+                break;
+
+            case "search":
+                file = "search.html";
+                break;
+
+            default:
+                return new Response(
+                    "Página Saturnium desconhecida",
+                    {
+                        status: 404
+                    }
+                );
+        }
+
+        const filePath = path.join(
+            __dirname,
+            file
+        );
+
+        return net.fetch(
+            pathToFileURL(filePath).toString()
+        );
+    });
+
+    // Criar janela principal
+    createWindow();
+
+});
 
 // ==========================================
 // MACOS
@@ -931,7 +1003,6 @@ app.on(
 
     }
 );
-
 
 // ==========================================
 // FECHAR

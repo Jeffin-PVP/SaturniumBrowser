@@ -256,12 +256,12 @@ function renderTabs(data) {
 
         favicon.src =
             tab.favicon ||
-            "assets/voidbrowser-icon.png";
+            "assets/saturniumbrowser-icon.png";
 
         favicon.onerror = () => {
 
             favicon.src =
-                "assets/voidbrowser-icon.png";
+                "assets/saturniumbrowser-icon.png";
 
         };
 
@@ -770,3 +770,194 @@ window.browserAPI.onLoading(
 
     }
 );
+
+// =====================================
+// ATUALIZAÇÕES DO SATURNIUMBROWSER
+// =====================================
+
+let updateToast = null;
+let updateTitle = null;
+let updateMessage = null;
+let updateProgress = null;
+let updateButton = null;
+let updateCloseButton = null;
+
+
+function createUpdateToast() {
+
+    if (updateToast) {
+        return;
+    }
+
+    updateToast = document.createElement("div");
+    updateToast.id = "update-toast";
+    updateToast.className = "update-toast";
+
+    const header = document.createElement("div");
+    header.className = "update-toast-header";
+
+    updateTitle = document.createElement("div");
+    updateTitle.className = "update-toast-title";
+
+    updateCloseButton = document.createElement("button");
+    updateCloseButton.className = "update-toast-close";
+    updateCloseButton.type = "button";
+    updateCloseButton.textContent = "×";
+    updateCloseButton.title = "Fechar";
+
+    updateCloseButton.addEventListener("click", () => {
+        hideUpdateToast();
+    });
+
+    header.appendChild(updateTitle);
+    header.appendChild(updateCloseButton);
+
+    updateMessage = document.createElement("div");
+    updateMessage.className = "update-toast-message";
+
+    updateProgress = document.createElement("div");
+    updateProgress.className = "update-progress";
+
+    const progressBar = document.createElement("div");
+    progressBar.className = "update-progress-bar";
+    updateProgress.appendChild(progressBar);
+    updateProgress._bar = progressBar;
+
+    updateButton = document.createElement("button");
+    updateButton.className = "update-install-button";
+    updateButton.type = "button";
+    updateButton.textContent = "Reiniciar e atualizar";
+    updateButton.style.display = "none";
+
+    updateButton.addEventListener("click", () => {
+        updateButton.disabled = true;
+        updateButton.textContent = "Reiniciando...";
+        window.browserAPI.update.install();
+    });
+
+    updateToast.appendChild(header);
+    updateToast.appendChild(updateMessage);
+    updateToast.appendChild(updateProgress);
+    updateToast.appendChild(updateButton);
+
+    document.body.appendChild(updateToast);
+}
+
+
+function showUpdateToast(title, message, options = {}) {
+
+    createUpdateToast();
+
+    updateTitle.textContent = title;
+    updateMessage.textContent = message;
+
+    updateProgress.style.display =
+        options.progress === undefined ? "none" : "block";
+
+    if (options.progress !== undefined) {
+        updateProgress._bar.style.width =
+            `${Math.max(0, Math.min(100, options.progress))}%`;
+    }
+
+    updateButton.style.display =
+        options.install ? "block" : "none";
+
+    updateButton.disabled = false;
+    updateButton.textContent = "Reiniciar e atualizar";
+
+    updateToast.classList.add("visible");
+}
+
+
+function hideUpdateToast() {
+
+    if (!updateToast) {
+        return;
+    }
+
+    updateToast.classList.remove("visible");
+}
+
+
+window.browserAPI.update.onChecking(() => {
+
+    // O início da verificação não precisa interromper o usuário.
+
+});
+
+
+window.browserAPI.update.onAvailable((data) => {
+
+    const version =
+        data && data.version
+            ? data.version
+            : "nova versão";
+
+    showUpdateToast(
+        "Atualização disponível",
+        `SaturniumBrowser ${version} está sendo baixado...`,
+        {
+            progress: 0
+        }
+    );
+
+});
+
+
+window.browserAPI.update.onProgress((data) => {
+
+    const percent =
+        data && Number.isFinite(data.percent)
+            ? data.percent
+            : 0;
+
+    showUpdateToast(
+        "Baixando atualização",
+        `SaturniumBrowser ${percent.toFixed(0)}% concluído.`,
+        {
+            progress: percent
+        }
+    );
+
+});
+
+
+window.browserAPI.update.onDownloaded((data) => {
+
+    const version =
+        data && data.version
+            ? data.version
+            : "nova versão";
+
+    showUpdateToast(
+        "Atualização pronta",
+        `A versão ${version} foi baixada e está pronta para instalação.`,
+        {
+            progress: 100,
+            install: true
+        }
+    );
+
+});
+
+
+window.browserAPI.update.onError((data) => {
+
+    const message =
+        data && data.message
+            ? data.message
+            : "Não foi possível verificar a atualização.";
+
+    showUpdateToast(
+        "Falha na atualização",
+        message,
+        {}
+    );
+
+    setTimeout(() => {
+
+        hideUpdateToast();
+
+    }, 10000);
+
+});

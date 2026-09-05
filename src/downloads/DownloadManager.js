@@ -16,7 +16,7 @@ class DownloadManager {
 
         this.dataDirectory = path.join(
             process.env.APPDATA || process.cwd(),
-            "VoidBrowser"
+            "SaturniumBrowser"
         );
 
         this.downloadsFile = path.join(

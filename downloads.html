@@ -9,7 +9,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Downloads - VoidBrowser</title>
+    <title>Downloads - SaturniumBrowser</title>
 
     <style>
 
@@ -288,7 +288,7 @@
 
             <h1>Downloads</h1>
 
-            <a id="clear-link" href="void://downloads/clear">
+            <a id="clear-link" href="saturnium://downloads/clear">
                 Limpar concluídos
             </a>
 
@@ -496,14 +496,14 @@
                     if (entry.state === "completed") {
 
                         actionsHTML = `
-                            <a href="void://downloads/open/${entry.id}">Abrir</a>
-                            <a href="void://downloads/folder/${entry.id}">Pasta</a>
+                            <a href="saturnium://downloads/open/${entry.id}">Abrir</a>
+                            <a href="saturnium://downloads/folder/${entry.id}">Pasta</a>
                         `;
 
                     } else if (entry.state === "progressing") {
 
                         actionsHTML = `
-                            <a href="void://downloads/cancel/${entry.id}">Cancelar</a>
+                            <a href="saturnium://downloads/cancel/${entry.id}">Cancelar</a>
                         `;
 
                     }

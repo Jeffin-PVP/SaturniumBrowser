@@ -342,6 +342,12 @@ contextBridge.exposeInMainWorld(
                 ),
 
 
+            check: () =>
+                ipcRenderer.send(
+                    "update-check"
+                ),
+
+
             install: () =>
                 ipcRenderer.send(
                     "update-install"

@@ -145,9 +145,9 @@ class TabManager {
 
             view,
 
-            title: "Nova aba - VoidBrowser",
+            title: "Nova aba - SaturniumBrowser",
 
-            url: url || "void://newtab",
+            url: url || "saturnium://newtab",
 
             internal: !url,
 
@@ -368,7 +368,7 @@ class TabManager {
 
 
         // =================================
-        // LINKS INTERNOS (void://...)
+        // LINKS INTERNOS (saturnium://...)
         // CLICADOS DENTRO DA PRÓPRIA PÁGINA
         // =================================
 
@@ -377,7 +377,7 @@ class TabManager {
             (event, url) => {
 
                 if (
-                    /^void:\/\//i.test(url)
+                    /^saturnium:\/\//i.test(url)
                 ) {
 
                     event.preventDefault();
@@ -478,7 +478,7 @@ class TabManager {
 
                 tab.title =
                     title ||
-                    "Nova aba - VoidBrowser";
+                    "Nova aba - SaturniumBrowser";
 
 
                 if (
@@ -952,10 +952,10 @@ class TabManager {
 
             tab.internal = true;
 
-            tab.url = "void://newtab";
+            tab.url = "saturnium://newtab";
 
             tab.title =
-                "Nova aba - VoidBrowser";
+                "Nova aba - SaturniumBrowser";
 
 
             tab.view.webContents.loadFile(
@@ -975,10 +975,10 @@ class TabManager {
 
             tab.internal = true;
 
-            tab.url = "void://history";
+            tab.url = "saturnium://history";
 
             tab.title =
-                "Histórico - VoidBrowser";
+                "Histórico - SaturniumBrowser";
 
 
             tab.view.webContents.loadFile(
@@ -1018,10 +1018,10 @@ class TabManager {
 
             tab.internal = true;
 
-            tab.url = "void://downloads";
+            tab.url = "saturnium://downloads";
 
             tab.title =
-                "Downloads - VoidBrowser";
+                "Downloads - SaturniumBrowser";
 
 
             tab.view.webContents.loadFile(
@@ -1063,13 +1063,13 @@ class TabManager {
             tab.internal = true;
 
             tab.url =
-                "void://search?q=" +
+                "saturnium://search?q=" +
                 encodeURIComponent(query);
 
             tab.title =
                 query
-                    ? `${query} - Busca VoidBrowser`
-                    : "Busca - VoidBrowser";
+                    ? `${query} - Busca SaturniumBrowser`
+                    : "Busca - SaturniumBrowser";
 
 
             tab.view.webContents.loadFile(
@@ -1113,7 +1113,7 @@ class TabManager {
                     // a busca acontecia.
                     if (
                         tab.url !==
-                        "void://search?q=" + encodeURIComponent(query)
+                        "saturnium://search?q=" + encodeURIComponent(query)
                     ) {
 
                         return;
@@ -1195,20 +1195,20 @@ class TabManager {
 
 
         // =================================
-        // PÁGINA INTERNA DO VOIDBROWSER
+        // PÁGINA INTERNA DO SATURNIUMBROWSER
         // =================================
 
         if (
-            /^void:\/\//i.test(value)
+            /^saturnium:\/\//i.test(value)
         ) {
 
             // =============================
             // BUSCA (usa query string, ex:
-            // void://search?q=algo)
+            // saturnium://search?q=algo)
             // =============================
 
             if (
-                /^void:\/\/search/i.test(value)
+                /^saturnium:\/\/search/i.test(value)
             ) {
 
                 let query = "";
@@ -1241,7 +1241,7 @@ class TabManager {
             const parts =
                 value
                     .replace(
-                        /^void:\/\//i,
+                        /^saturnium:\/\//i,
                         ""
                     )
                     .split("/");
@@ -1443,7 +1443,7 @@ class TabManager {
 
         // =================================
         // PESQUISA (mecanismo próprio do
-        // VoidBrowser — não depende do Google)
+        // SaturniumBrowser — não depende do Google)
         // =================================
 
         this.openInternalPage(

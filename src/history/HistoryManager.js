@@ -7,7 +7,7 @@ class HistoryManager {
 
         this.dataDirectory = path.join(
             process.env.APPDATA || process.cwd(),
-            "VoidBrowser"
+            "SaturniumBrowser"
         );
 
         this.historyFile = path.join(
@@ -132,7 +132,7 @@ class HistoryManager {
 
 
         // Não registrar páginas internas
-        if (url.startsWith("void://")) {
+        if (url.startsWith("saturnium://")) {
             return;
         }
 

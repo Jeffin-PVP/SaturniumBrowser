@@ -9,7 +9,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Histórico - VoidBrowser</title>
+    <title>Histórico - SaturniumBrowser</title>
 
     <style>
 
@@ -233,7 +233,7 @@
 
             <h1>Histórico</h1>
 
-            <a id="clear-link" href="void://history/clear">
+            <a id="clear-link" href="saturnium://history/clear">
                 Limpar histórico
             </a>
 
@@ -372,8 +372,8 @@
                         <span class="entry-time">${formatTime(entry.visitedAt)}</span>
                         <img
                             class="entry-favicon"
-                            src="${escapeHTML(entry.favicon) || 'assets/voidbrowser-icon.png'}"
-                            onerror="this.onerror=null; this.src='assets/voidbrowser-icon.png';"
+                            src="${escapeHTML(entry.favicon) || 'assets/saturniumbrowser-icon.png'}"
+                            onerror="this.onerror=null; this.src='assets/saturniumbrowser-icon.png';"
                         >
                         <span class="entry-info">
                             <div class="entry-title">${escapeHTML(entry.title)}</div>

@@ -86,14 +86,14 @@ class URLUtils {
 
 
         // Pesquisa (mecanismo próprio do
-        // VoidBrowser, não depende do Google)
+        // SaturniumBrowser, não depende do Google)
 
         return {
             type: "search",
             query: value,
 
             url:
-                "void://search?q=" +
+                "saturnium://search?q=" +
                 encodeURIComponent(value)
         };
 

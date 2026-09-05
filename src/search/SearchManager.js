@@ -5,8 +5,8 @@
 // HTML público do DuckDuckGo, sem chave de API) e devolve
 // uma lista simples de { title, url, snippet }.
 //
-// O VoidBrowser desenha esses resultados com sua própria
-// interface (void://search) — o usuário nunca visita o
+// O SaturniumBrowser desenha esses resultados com sua própria
+// interface (saturnium://search) — o usuário nunca visita o
 // site de busca de terceiros diretamente.
 // =====================================================
 

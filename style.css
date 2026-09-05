@@ -627,3 +627,151 @@ button:disabled {
 button:disabled:hover {
     background: transparent;
 }
+
+/* ==========================================
+   NOTIFICAÇÃO DE ATUALIZAÇÃO
+   ========================================== */
+
+.update-toast {
+
+    position: fixed;
+
+    top: 12px;
+    right: 16px;
+
+    width: 340px;
+
+    padding: 15px;
+
+    border: 1px solid #2d3150;
+    border-radius: 12px;
+
+    background: rgba(13, 16, 30, 0.97);
+
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+
+    z-index: 99999;
+
+    opacity: 0;
+    pointer-events: none;
+
+    transform: translateY(-10px);
+
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+.update-toast.visible {
+
+    opacity: 1;
+    pointer-events: auto;
+
+    transform: translateY(0);
+}
+
+.update-toast-header {
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+}
+
+.update-toast-title {
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #ffffff;
+}
+
+.update-toast-close {
+
+    width: 25px;
+    height: 25px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: transparent;
+    color: #8d93a7;
+
+    font-size: 18px;
+
+    cursor: pointer;
+}
+
+.update-toast-close:hover {
+
+    background: #24283a;
+    color: #ffffff;
+}
+
+.update-toast-message {
+
+    margin-top: 8px;
+
+    color: #aeb4c7;
+
+    font-size: 12px;
+    line-height: 1.45;
+
+    word-break: break-word;
+}
+
+.update-progress {
+
+    width: 100%;
+    height: 6px;
+
+    margin-top: 12px;
+
+    overflow: hidden;
+
+    border-radius: 99px;
+
+    background: #20243a;
+}
+
+.update-progress-bar {
+
+    width: 0%;
+    height: 100%;
+
+    border-radius: inherit;
+
+    background: linear-gradient(
+        90deg,
+        #6366f1,
+        #9b5cff
+    );
+
+    transition: width 0.2s ease;
+}
+
+.update-install-button {
+
+    width: 100%;
+
+    margin-top: 12px;
+
+    padding: 9px 12px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #7657ff;
+    color: #ffffff;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.update-install-button:hover {
+
+    background: #886cff;
+}
