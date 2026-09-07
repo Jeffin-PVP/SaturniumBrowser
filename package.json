@@ -1,6 +1,6 @@
 {
   "name": "saturniumbrowser",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Navegador personalizado SaturniumBrowser",
   "main": "main.js",
   "scripts": {

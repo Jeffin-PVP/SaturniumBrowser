@@ -44,7 +44,7 @@ function createWindow() {
         icon: path.join(
             __dirname,
             "assets",
-            "saturniumbrowser.ico"
+            "saturniumbrowser-ico.ico"
         ),
 
         webPreferences: {
