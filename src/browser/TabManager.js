@@ -41,6 +41,13 @@ const SEARCH_PAGE = path.join(
     "search.html"
 );
 
+const BLOCKED_PAGE = path.join(
+    __dirname,
+    "..",
+    "..",
+    "blocked.html"
+);
+
 
 class TabManager {
 
@@ -90,6 +97,12 @@ class TabManager {
 
         this.performSearch =
             callbacks.performSearch || null;
+
+        this.checkUrlSafety =
+            callbacks.checkUrlSafety || null;
+
+        this.allowUrlOnce =
+            callbacks.allowUrlOnce || null;
 
         this.tabs = [];
 
@@ -383,6 +396,71 @@ class TabManager {
                     event.preventDefault();
 
                     this.navigate(url);
+
+                    return;
+                }
+
+
+                // =============================
+                // CHECAGEM DE SEGURANÇA
+                // (links clicados dentro de
+                // páginas, redirecionamentos
+                // via JS, etc.)
+                // =============================
+
+                const safety =
+                    typeof this.checkUrlSafety === "function"
+                        ? this.checkUrlSafety(url)
+                        : { blocked: false };
+
+
+                if (safety && safety.blocked) {
+
+                    event.preventDefault();
+
+                    this.openInternalPage(
+                        "blocked",
+                        {
+                            url,
+                            reason: safety.reason,
+                            category: safety.category
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+
+        // =================================
+        // REDIRECIONAMENTOS DE SERVIDOR
+        // (ex: um site "limpo" redirecionando
+        // pra uma página de phishing)
+        // =================================
+
+        webContents.on(
+            "will-redirect",
+            (event, url) => {
+
+                const safety =
+                    typeof this.checkUrlSafety === "function"
+                        ? this.checkUrlSafety(url)
+                        : { blocked: false };
+
+
+                if (safety && safety.blocked) {
+
+                    event.preventDefault();
+
+                    this.openInternalPage(
+                        "blocked",
+                        {
+                            url,
+                            reason: safety.reason,
+                            category: safety.category
+                        }
+                    );
 
                 }
 
@@ -1135,6 +1213,51 @@ class TabManager {
             return;
         }
 
+
+        if (page === "blocked") {
+
+            const blockedUrl =
+                options.url || "";
+
+
+            tab.internal = true;
+
+            tab.url =
+                "saturnium://blocked?url=" +
+                encodeURIComponent(blockedUrl);
+
+            tab.title =
+                "Aviso de segurança - SaturniumBrowser";
+
+
+            tab.view.webContents.loadFile(
+                BLOCKED_PAGE
+            );
+
+
+            tab.view.webContents.once(
+                "did-finish-load",
+                () => {
+
+                    tab.view.webContents.executeJavaScript(
+                        `window.renderSecurityWarning(${JSON.stringify({
+                            url: blockedUrl,
+                            reason: options.reason || "",
+                            category: options.category || ""
+                        })})`
+                    ).catch(() => {});
+
+                }
+            );
+
+
+            this.sendTabUpdate(tab);
+
+            this.sendTabs();
+
+            return;
+        }
+
     }
 
 
@@ -1163,6 +1286,43 @@ class TabManager {
 
         this.openInternalPage(
             "downloads"
+        );
+
+    }
+
+
+    // =====================================
+    // CARREGAR URL REAL (com checagem
+    // de segurança antes de navegar)
+    // =====================================
+
+    loadRealUrl(tab, url) {
+
+        const safety =
+            typeof this.checkUrlSafety === "function"
+                ? this.checkUrlSafety(url)
+                : { blocked: false };
+
+
+        if (safety && safety.blocked) {
+
+            this.openInternalPage(
+                "blocked",
+                {
+                    url,
+                    reason: safety.reason,
+                    category: safety.category
+                }
+            );
+
+            return;
+        }
+
+
+        tab.url = url;
+
+        tab.view.webContents.loadURL(
+            url
         );
 
     }
@@ -1232,6 +1392,71 @@ class TabManager {
                 this.openInternalPage(
                     "search",
                     { query }
+                );
+
+                return;
+            }
+
+
+            // =============================
+            // CONTINUAR MESMO ASSIM APÓS
+            // AVISO DE SEGURANÇA
+            // (saturnium://blocked/continue?url=...)
+            // =============================
+
+            if (
+                /^saturnium:\/\/blocked\/continue/i.test(value)
+            ) {
+
+                let targetUrl = "";
+
+                try {
+
+                    const parsedBlocked =
+                        new URL(value);
+
+                    targetUrl =
+                        parsedBlocked.searchParams.get("url") ||
+                        "";
+
+                } catch (error) {
+
+                    targetUrl = "";
+
+                }
+
+
+                if (!targetUrl) {
+
+                    this.openInternalPage(
+                        "newtab"
+                    );
+
+                    return;
+                }
+
+
+                try {
+
+                    const hostname =
+                        new URL(targetUrl).hostname;
+
+                    if (
+                        typeof this.allowUrlOnce === "function"
+                    ) {
+
+                        this.allowUrlOnce(
+                            hostname
+                        );
+
+                    }
+
+                } catch (error) {}
+
+
+                this.loadRealUrl(
+                    tab,
+                    targetUrl
                 );
 
                 return;
@@ -1362,11 +1587,7 @@ class TabManager {
             /^https?:\/\//i.test(value)
         ) {
 
-            tab.url = value;
-
-            tab.view.webContents.loadURL(
-                value
-            );
+            this.loadRealUrl(tab, value);
 
             return;
         }
@@ -1384,12 +1605,7 @@ class TabManager {
                 "http://" + value;
 
 
-            tab.url = url;
-
-
-            tab.view.webContents.loadURL(
-                url
-            );
+            this.loadRealUrl(tab, url);
 
             return;
         }
@@ -1407,12 +1623,7 @@ class TabManager {
                 "http://" + value;
 
 
-            tab.url = url;
-
-
-            tab.view.webContents.loadURL(
-                url
-            );
+            this.loadRealUrl(tab, url);
 
             return;
         }
@@ -1430,12 +1641,7 @@ class TabManager {
                 "https://" + value;
 
 
-            tab.url = url;
-
-
-            tab.view.webContents.loadURL(
-                url
-            );
+            this.loadRealUrl(tab, url);
 
             return;
         }

@@ -188,6 +188,20 @@
         }
 
 
+        .entry-icon.blocked {
+            color: #ff8080;
+
+            background: rgba(255, 128, 128, 0.12);
+        }
+
+
+        .entry-icon.caution {
+            color: #ffc266;
+
+            background: rgba(255, 194, 102, 0.12);
+        }
+
+
         .entry-info {
             min-width: 0;
 
@@ -385,7 +399,34 @@
 
             }
 
+            if (entry.state === "blocked") {
+
+                return {
+                    icon: "🛡",
+                    iconClass: "blocked",
+                    text:
+                        entry.riskReason ||
+                        "Download bloqueado por segurança — fonte maliciosa conhecida.",
+                    percent: null
+                };
+
+            }
+
+
             if (entry.state === "completed") {
+
+                if (entry.risk === "caution") {
+
+                    return {
+                        icon: "⚠",
+                        iconClass: "caution",
+                        text:
+                            `Concluído — ${formatBytes(entry.totalBytes)} · ${entry.riskReason || "Abra com cuidado."}`,
+                        percent: null
+                    };
+
+                }
+
 
                 return {
                     icon: "✓",

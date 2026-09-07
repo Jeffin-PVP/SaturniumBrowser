@@ -4,7 +4,8 @@ const {
     ipcMain,
     Menu,
     protocol,
-    net
+    net,
+    session
 } = require("electron");
 
 const path =
@@ -95,11 +96,19 @@ function createWindow() {
         }
     );
 
-    updateManager = new UpdateManager(win);
+    if (!updateManager) {
 
-    setTimeout(() => {
-        updateManager.checkForUpdates();
-    }, 5000);
+        updateManager = new UpdateManager(win);
+
+        setTimeout(() => {
+            updateManager.checkForUpdates();
+        }, 5000);
+
+    } else {
+
+        updateManager.window = win;
+
+    }
 
     // ======================================
     // REDIMENSIONAMENTO
@@ -386,7 +395,7 @@ ipcMain.on("update-check", () => {
 
     if (!updateManager) return;
 
-    updateManager.checkForUpdates();
+    updateManager.checkForUpdates(true);
 
 });
 
@@ -769,6 +778,27 @@ ipcMain.on(
                     browserManager.openDownloads();
 
                 }
+            },
+
+            {
+                type: "separator"
+            },
+
+            {
+                label: "Verificar atualizações",
+
+                click: () => {
+
+                    if (!updateManager) {
+
+                        return;
+
+                    }
+
+
+                    updateManager.checkForUpdates(true);
+
+                }
             }
 
         ];
@@ -934,6 +964,82 @@ protocol.registerSchemesAsPrivileged([
 // ==========================================
 
 app.whenReady().then(async () => {
+
+    // ==========================================
+    // PERMISSÕES SENSÍVEIS — NEGADAS POR PADRÃO
+    // (câmera, microfone, localização, notificações,
+    // captura de tela, USB/Bluetooth/HID/serial etc.)
+    // Só o essencial pra navegação normal é permitido.
+    // ==========================================
+
+    const ALLOWED_PERMISSIONS = new Set([
+        "fullscreen",
+        "pointerLock",
+        "clipboard-sanitized-write"
+    ]);
+
+    session.defaultSession.setPermissionRequestHandler(
+        (webContents, permission, callback) => {
+
+            callback(
+                ALLOWED_PERMISSIONS.has(permission)
+            );
+
+        }
+    );
+
+    session.defaultSession.setPermissionCheckHandler(
+        (webContents, permission) => {
+
+            return ALLOWED_PERMISSIONS.has(permission);
+
+        }
+    );
+
+    // ==========================================
+    // BLOQUEIO DE REDE
+    // Barra qualquer requisição (script, iframe,
+    // imagem, anúncio etc) vinda de um domínio já
+    // confirmado como malicioso — não só a
+    // navegação principal, mas tudo que a página
+    // tentar carregar por baixo dos panos.
+    // ==========================================
+
+    session.defaultSession.webRequest.onBeforeRequest(
+        (details, callback) => {
+
+            if (!browserManager) {
+
+                callback({ cancel: false });
+
+                return;
+            }
+
+
+            let host = "";
+
+            try {
+
+                host = new URL(details.url).hostname.toLowerCase();
+
+            } catch (error) {
+
+                callback({ cancel: false });
+
+                return;
+            }
+
+
+            const isMalicious =
+                browserManager.security.isKnownMaliciousHost(
+                    host
+                );
+
+
+            callback({ cancel: isMalicious });
+
+        }
+    );
 
     // Registrar protocolo interno Saturnium
     protocol.handle("saturnium", async (request) => {

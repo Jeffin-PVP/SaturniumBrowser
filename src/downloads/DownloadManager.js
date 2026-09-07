@@ -13,6 +13,9 @@ class DownloadManager {
         this.onChange =
             callbacks.onChange || (() => {});
 
+        this.checkDownloadRisk =
+            callbacks.checkDownloadRisk || null;
+
 
         this.dataDirectory = path.join(
             process.env.APPDATA || process.cwd(),
@@ -175,6 +178,15 @@ class DownloadManager {
         const id = this.nextId++;
 
 
+        const risk =
+            typeof this.checkDownloadRisk === "function"
+                ? this.checkDownloadRisk(
+                    item.getURL(),
+                    item.getFilename()
+                )
+                : { risk: "safe" };
+
+
         const entry = {
 
             id,
@@ -194,9 +206,31 @@ class DownloadManager {
 
             state: "progressing",
 
-            startedAt: Date.now()
+            startedAt: Date.now(),
+
+            risk:
+                risk.risk || "safe",
+
+            riskReason:
+                risk.reason || null
 
         };
+
+
+        // =============================
+        // BLOQUEIO AUTOMÁTICO
+        // Fonte já confirmada como maliciosa
+        // numa lista pública — cancela o
+        // download antes que ele termine.
+        // =============================
+
+        if (entry.risk === "dangerous") {
+
+            item.cancel();
+
+            entry.state = "blocked";
+
+        }
 
 
         this.downloads.unshift(entry);
@@ -222,7 +256,13 @@ class DownloadManager {
                     item.getTotalBytes();
 
                 // "progressing" ou "interrupted"
-                entry.state = state;
+                // (não sobrescreve um bloqueio
+                // já aplicado)
+                if (entry.state !== "blocked") {
+
+                    entry.state = state;
+
+                }
 
                 this.save();
 
@@ -238,7 +278,13 @@ class DownloadManager {
 
                 // "completed", "cancelled"
                 // ou "interrupted"
-                entry.state = state;
+                // (não sobrescreve um bloqueio
+                // de segurança já aplicado)
+                if (entry.state !== "blocked") {
+
+                    entry.state = state;
+
+                }
 
                 entry.savePath =
                     item.getSavePath();

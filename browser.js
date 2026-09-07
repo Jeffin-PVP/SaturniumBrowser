@@ -425,6 +425,61 @@ function updateActiveTab(tab) {
     urlInput.value =
         tab.url || "";
 
+
+    updateSecurityIndicator(
+        tab.url || ""
+    );
+
+}
+
+
+// =====================================
+// INDICADOR DE SEGURANÇA (HTTPS/HTTP)
+// =====================================
+
+const securityIndicator =
+    document.getElementById("security-indicator");
+
+
+function updateSecurityIndicator(url) {
+
+    securityIndicator.classList.remove(
+        "secure",
+        "insecure"
+    );
+
+
+    if (url.startsWith("https://")) {
+
+        securityIndicator.textContent = "🔒";
+
+        securityIndicator.title =
+            "Conexão segura (HTTPS)";
+
+        securityIndicator.classList.add(
+            "secure"
+        );
+
+        return;
+    }
+
+
+    if (url.startsWith("http://")) {
+
+        securityIndicator.textContent = "⚠";
+
+        securityIndicator.title =
+            "Conexão não segura (HTTP) — evite inserir senhas ou dados sensíveis";
+
+        securityIndicator.classList.add(
+            "insecure"
+        );
+
+        return;
+    }
+
+    // Páginas internas (saturnium://) e
+    // outros casos: sem indicador.
 }
 
 
@@ -849,7 +904,9 @@ function showUpdateToast(title, message, options = {}) {
     createUpdateToast();
 
     updateTitle.textContent = title;
+
     updateMessage.textContent = message;
+    updateMessage.title = message;
 
     updateProgress.style.display =
         options.progress === undefined ? "none" : "block";
@@ -904,6 +961,31 @@ window.browserAPI.update.onAvailable((data) => {
 });
 
 
+window.browserAPI.update.onNotAvailable((data) => {
+
+    if (!data || !data.manual) {
+
+        return;
+    }
+
+
+    showUpdateToast(
+        "Tudo certo",
+        `Você já está usando a versão mais recente${
+            data.version ? " (" + data.version + ")" : ""
+        }.`,
+        {}
+    );
+
+    setTimeout(() => {
+
+        hideUpdateToast();
+
+    }, 4000);
+
+});
+
+
 window.browserAPI.update.onProgress((data) => {
 
     const percent =
@@ -933,7 +1015,6 @@ window.browserAPI.update.onDownloaded((data) => {
         "Atualização pronta",
         `A versão ${version} foi baixada e está pronta para instalação.`,
         {
-            progress: 100,
             install: true
         }
     );

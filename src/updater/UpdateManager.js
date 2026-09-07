@@ -15,6 +15,7 @@ class UpdateManager {
         this.updateDownloaded = false;
         this.availableVersion = null;
         this.lastError = null;
+        this.lastCheckWasManual = false;
 
         this.logDirectory = app.getPath("userData");
         this.logFile = path.join(
@@ -177,7 +178,10 @@ class UpdateManager {
                     "update-not-available",
                     {
                         version:
-                            info.version || app.getVersion()
+                            info.version || app.getVersion(),
+
+                        manual:
+                            this.lastCheckWasManual
                     }
                 );
 
@@ -299,7 +303,10 @@ class UpdateManager {
     // VERIFICAR ATUALIZAÇÃO
     // =====================================
 
-    async checkForUpdates() {
+    async checkForUpdates(manual = false) {
+
+        this.lastCheckWasManual = manual;
+
 
         if (!this.isPackaged()) {
 
@@ -307,6 +314,20 @@ class UpdateManager {
                 "INFO",
                 "Aplicativo não empacotado. Verificação ignorada."
             );
+
+
+            if (manual) {
+
+                this.send(
+                    "update-error",
+                    {
+                        message:
+                            "Verificação de atualizações não está disponível em modo de desenvolvimento."
+                    }
+                );
+
+            }
+
 
             return null;
 

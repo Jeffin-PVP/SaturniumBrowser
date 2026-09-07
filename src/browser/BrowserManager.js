@@ -15,6 +15,9 @@ const DownloadManager =
 const SearchManager =
     require("../search/SearchManager");
 
+const SecurityManager =
+    require("../security/SecurityManager");
+
 
 class BrowserManager {
 
@@ -34,6 +37,12 @@ class BrowserManager {
         // =====================================
 
         this.search = new SearchManager();
+
+        // =====================================
+        // SEGURANÇA
+        // =====================================
+
+        this.security = new SecurityManager();
 
         // =====================================
         // GERENCIADOR DE ABAS
@@ -74,7 +83,13 @@ class BrowserManager {
                         this.downloads.showInFolder(id),
 
                     performSearch: (query) =>
-                        this.search.search(query)
+                        this.search.search(query),
+
+                    checkUrlSafety: (url) =>
+                        this.security.check(url),
+
+                    allowUrlOnce: (hostname) =>
+                        this.security.allowOnce(hostname)
 
                 }
             );
@@ -104,7 +119,10 @@ class BrowserManager {
 
                     this.sendDownloadsUpdate();
 
-                }
+                },
+
+                checkDownloadRisk: (url, filename) =>
+                    this.security.checkDownload(url, filename)
 
             });
 

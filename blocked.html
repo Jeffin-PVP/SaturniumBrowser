@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Aviso de segurança - SaturniumBrowser</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            width: 100vw;
+            height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-family: Arial, sans-serif;
+
+            color: #1a1a1a;
+
+            background: #b3261e;
+        }
+
+
+        .container {
+            max-width: 560px;
+
+            padding: 40px;
+
+            text-align: center;
+        }
+
+
+        .icon {
+            font-size: 56px;
+
+            margin-bottom: 10px;
+        }
+
+
+        h1 {
+            margin: 0 0 14px;
+
+            font-size: 26px;
+
+            color: #ffffff;
+        }
+
+
+        p {
+            color: #ffe3e1;
+
+            font-size: 15px;
+
+            line-height: 1.6;
+        }
+
+
+        .url-box {
+            margin: 18px 0;
+
+            padding: 10px 16px;
+
+            border-radius: 8px;
+
+            background: rgba(0, 0, 0, 0.2);
+
+            color: #ffffff;
+
+            font-size: 13px;
+
+            word-break: break-all;
+        }
+
+
+        .category {
+            display: inline-block;
+
+            margin-bottom: 14px;
+
+            padding: 4px 12px;
+
+            border-radius: 20px;
+
+            background: rgba(255, 255, 255, 0.15);
+
+            color: #ffffff;
+
+            font-size: 11px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 1px;
+        }
+
+
+        .actions {
+            margin-top: 28px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 12px;
+        }
+
+
+        #back-button {
+            padding: 13px;
+
+            border: none;
+            border-radius: 8px;
+
+            background: #ffffff;
+
+            color: #b3261e;
+
+            font-size: 14px;
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+
+        #back-button:hover {
+            background: #f2f2f2;
+        }
+
+
+        #continue-link {
+            color: #ffd9d6;
+
+            font-size: 12px;
+
+            text-decoration: underline;
+
+            cursor: pointer;
+        }
+
+
+        #continue-link:hover {
+            color: #ffffff;
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <div class="icon">⚠️</div>
+
+        <span id="category" class="category"></span>
+
+        <h1>Este site pode não ser seguro</h1>
+
+        <p id="reason">
+            O SaturniumBrowser identificou um risco neste endereço.
+        </p>
+
+        <div id="url-box" class="url-box"></div>
+
+        <div class="actions">
+
+            <button id="back-button" type="button">
+                Voltar para a segurança
+            </button>
+
+            <a id="continue-link">
+                Continuar mesmo assim (não recomendado)
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        let blockedUrl = "";
+
+
+        document.getElementById(
+            "back-button"
+        ).addEventListener(
+            "click",
+            () => {
+
+                window.location.href =
+                    "saturnium://newtab";
+
+            }
+        );
+
+
+        document.getElementById(
+            "continue-link"
+        ).addEventListener(
+            "click",
+            () => {
+
+                if (!blockedUrl) {
+
+                    return;
+                }
+
+
+                window.location.href =
+                    "saturnium://blocked/continue?url=" +
+                    encodeURIComponent(blockedUrl);
+
+            }
+        );
+
+
+        // ==========================================
+        // RENDERIZAR AVISO
+        // ==========================================
+
+        window.renderSecurityWarning = function (data) {
+
+            const { url, reason, category } =
+                data || {};
+
+            blockedUrl = url || "";
+
+
+            document.getElementById(
+                "url-box"
+            ).textContent = url || "";
+
+            document.getElementById(
+                "reason"
+            ).textContent =
+                reason ||
+                "O SaturniumBrowser identificou um risco neste endereço.";
+
+            document.getElementById(
+                "category"
+            ).textContent =
+                category || "aviso";
+
+        };
+
+    </script>
+
+</body>
+
+</html>
