@@ -1,0 +1,14 @@
+{
+  "name": "Saturnium Themes",
+  "id": "saturnium.themes",
+  "version": "1.1.0",
+  "description": "Personalize cores, destaque e papel de parede do SaturniumBrowser.",
+  "author": "Saturnium",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": [
+    "theme.apply",
+    "newtab.wallpaper",
+    "storage"
+  ]
+}

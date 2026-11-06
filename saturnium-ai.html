@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; img-src 'self' data:;">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaturniumAI</title>
+<link rel="stylesheet" href="src/internal/saturnium-ai.css">
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><div class="orb">◉</div><div><strong>SaturniumAI</strong><span>Inteligência escolhida por você</span></div></div>
+  <button id="settingsBtn" class="ghost">⚙ Configurar</button>
+</header>
+<main>
+  <section id="chat" class="chat"></section>
+  <div id="status" class="status">Selecione um provedor e envie uma mensagem.</div>
+  <form id="composer">
+    <textarea id="prompt" rows="2" maxlength="12000" placeholder="Pergunte ao SaturniumAI..."></textarea>
+    <div class="composer-row"><span id="providerLabel">Provedor: —</span><div><button type="button" id="stopBtn" class="ghost">Parar</button><button class="send" type="submit">Enviar ↗</button></div></div>
+  </form>
+</main>
+</div>
+<div id="settings" class="modal hidden">
+ <div class="panel">
+  <div class="panel-head"><h2>Provedores</h2><button id="closeSettings" class="ghost">✕</button></div>
+  <label>Provedor ativo<select id="provider"></select></label>
+  <div id="providerFields"></div>
+  <p class="hint">Chaves de API ficam no processo principal e são armazenadas usando a proteção de credenciais do sistema quando disponível.</p>
+  <div class="actions"><button id="testBtn" class="ghost">Testar conexão</button><button id="saveBtn" class="send">Salvar</button></div>
+  <div id="testResult" class="status"></div>
+ </div>
+</div>
+<script src="src/internal/saturnium-ai.js"></script>
+</body>
+</html>

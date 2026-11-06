@@ -30,12 +30,13 @@
             color: white;
 
             background:
-                radial-gradient(
-                    circle at 50% 35%,
-                    #151b35 0%,
-                    #090c18 35%,
-                    #05060b 70%
-                );
+                var(--sb-wallpaper,
+                    radial-gradient(
+                        circle at 50% 35%,
+                        #151b35 0%,
+                        #090c18 35%,
+                        #05060b 70%
+                    ));
         }
 
 
@@ -124,7 +125,7 @@
 
 
         .search-box:focus-within {
-            border-color: #695cff;
+            border-color: var(--sb-accent, #695cff);
 
             box-shadow:
                 0 0 30px rgba(105, 92, 255, 0.25);
@@ -136,7 +137,7 @@
 
             margin-right: 12px;
 
-            color: #777fff;
+            color: var(--sb-accent, #777fff);
         }
 
 

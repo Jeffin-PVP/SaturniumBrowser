@@ -113,6 +113,9 @@ contextBridge.exposeInMainWorld(
             ),
 
 
+        openAI: () => ipcRenderer.send("ai-open"),
+
+
         // ==========================================
         // HISTÓRICO
         // ==========================================

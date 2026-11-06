@@ -19,11 +19,16 @@ const BrowserManager =
 const UpdateManager =
     require("./src/updater/UpdateManager");
 
+const AIManager =
+    require("./src/ai/AIManager");
+
 let win;
 
 let browserManager;
 
 let updateManager;
+
+let aiManager;
 
 // ==========================================
 // CRIAR JANELA
@@ -89,6 +94,11 @@ function createWindow() {
 
             browserManager =
                 new BrowserManager(win);
+
+            // Modo IA da busca usa o mesmo AIManager (provedor/chave) do SaturniumAI
+            if (aiManager) {
+                browserManager.ai = aiManager;
+            }
 
 
             browserManager.initialize();
@@ -400,6 +410,99 @@ ipcMain.on("update-check", () => {
 });
 
 
+// ==========================================
+// EXTENSÕES — IPC SEGURO
+// Só as páginas internas de extensões (com o
+// preload seguro) podem chamar estes handlers.
+// ==========================================
+
+function isTrustedExtensionsEvent(event) {
+    return !!(
+        browserManager &&
+        browserManager.extensions &&
+        event &&
+        browserManager.isExtensionsWebContents(event.sender)
+    );
+}
+
+ipcMain.handle("extensions-list", (event) => {
+
+    if (!isTrustedExtensionsEvent(event)) throw new Error("UNAUTHORIZED");
+
+    return browserManager.extensions.list();
+
+});
+
+ipcMain.handle("extensions-set-enabled", (event, id, enabled) => {
+
+    if (!isTrustedExtensionsEvent(event)) throw new Error("UNAUTHORIZED");
+
+    if (typeof id !== "string") throw new Error("ID inválido.");
+
+    return browserManager.extensions.setEnabled(id, !!enabled);
+
+});
+
+ipcMain.handle("extensions-open-settings", (event, id) => {
+
+    if (!isTrustedExtensionsEvent(event)) throw new Error("UNAUTHORIZED");
+
+    if (typeof id !== "string") throw new Error("ID inválido.");
+
+    return browserManager.openExtensionSettings(id);
+
+});
+
+ipcMain.handle("extensions-call", async (event, id, method, args) => {
+
+    if (!isTrustedExtensionsEvent(event)) throw new Error("UNAUTHORIZED");
+
+    if (typeof id !== "string") throw new Error("ID inválido.");
+
+    return browserManager.extensions.call(id, method, args);
+
+});
+
+
+// ==========================================
+// SATURNIUM AI — IPC SEGURO
+// ==========================================
+
+function isTrustedAIEvent(event) {
+    return !!(
+        browserManager &&
+        event &&
+        browserManager.isAIWebContents(event.sender)
+    );
+}
+
+ipcMain.handle("saturnium-ai-config-get", (event) => {
+    if (!isTrustedAIEvent(event)) throw new Error("UNAUTHORIZED");
+    return aiManager.publicConfig();
+});
+
+ipcMain.handle("saturnium-ai-config-save", (event, config) => {
+    if (!isTrustedAIEvent(event)) throw new Error("UNAUTHORIZED");
+    return aiManager.saveConfig(config);
+});
+
+ipcMain.handle("saturnium-ai-chat", async (event, messages, options) => {
+    if (!isTrustedAIEvent(event)) throw new Error("UNAUTHORIZED");
+    return aiManager.chat(messages, options || {});
+});
+
+ipcMain.handle("saturnium-ai-test", async (event, provider) => {
+    if (!isTrustedAIEvent(event)) throw new Error("UNAUTHORIZED");
+    return aiManager.testConnection(provider);
+});
+
+ipcMain.handle("saturnium-ai-stop", (event) => {
+    if (!isTrustedAIEvent(event)) throw new Error("UNAUTHORIZED");
+    aiManager.stopAll();
+    return true;
+});
+
+
 ipcMain.on("update-install", () => {
 
     if (!updateManager) return;
@@ -567,6 +670,13 @@ ipcMain.on(
 // ==========================================
 // ABRIR HISTÓRICO (via menu)
 // ==========================================
+
+ipcMain.on(
+    "ai-open",
+    () => {
+        if (browserManager) browserManager.openAI();
+    }
+);
 
 ipcMain.on(
     "history-open",
@@ -776,6 +886,28 @@ ipcMain.on(
                 click: () => {
 
                     browserManager.openDownloads();
+
+                }
+            },
+
+            {
+                label: "Extensões",
+
+                click: () => {
+
+                    browserManager.openExtensions();
+
+                }
+            },
+
+            {
+                label: "SaturniumAI",
+
+                accelerator: "Ctrl+Shift+A",
+
+                click: () => {
+
+                    browserManager.openAI();
 
                 }
             },
@@ -1066,6 +1198,48 @@ app.whenReady().then(async () => {
                 file = "search.html";
                 break;
 
+            case "extensions":
+                file = "extensions.html";
+                break;
+
+            case "ext": {
+                // saturnium://ext/<id>/<arquivo> — arquivos de extensões ativas
+                const parts = url.pathname.split("/").filter(Boolean);
+                const extId = decodeURIComponent(parts.shift() || "");
+                const relative = decodeURIComponent(parts.join("/"));
+
+                const record = browserManager &&
+                    browserManager.extensions.extensions.get(extId);
+
+                if (!record || !record.enabled || !relative) {
+                    return new Response("Extensão não encontrada", { status: 404 });
+                }
+
+                const assetPath = browserManager.extensions.resolveAsset(extId, relative);
+
+                if (!assetPath) {
+                    return new Response("Recurso inválido", { status: 404 });
+                }
+
+                return net.fetch(pathToFileURL(assetPath).toString());
+            }
+
+            case "ai": {
+                // A página AI usa arquivos externos (CSS/JS).
+                // O protocolo interno precisa servi-los também.
+                if (url.pathname !== "/" && url.pathname !== "") {
+                    const relative = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+                    const candidate = path.resolve(__dirname, relative);
+                    const root = path.resolve(__dirname);
+                    if (!candidate.startsWith(root + path.sep)) {
+                        return new Response("Recurso interno inválido", { status: 403 });
+                    }
+                    return net.fetch(pathToFileURL(candidate).toString());
+                }
+                file = "saturnium-ai.html";
+                break;
+            }
+
             default:
                 return new Response(
                     "Página Saturnium desconhecida",
@@ -1084,6 +1258,12 @@ app.whenReady().then(async () => {
             pathToFileURL(filePath).toString()
         );
     });
+
+    // SaturniumAI vive no processo principal.
+    // As chaves e requisições nunca ficam expostas ao renderer.
+    if (!aiManager) {
+        aiManager = new AIManager();
+    }
 
     // Criar janela principal
     createWindow();

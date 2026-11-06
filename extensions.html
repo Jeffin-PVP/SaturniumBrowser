@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extensões - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh} .wrap{max-width:1100px;margin:auto;padding:42px} .hero{padding:30px;border:1px solid #20284b;border-radius:24px;background:linear-gradient(135deg,#0c1227,#11152e);box-shadow:0 20px 60px #0006}.brand{color:#79d8ff;letter-spacing:.2em;font-size:12px;font-weight:700}.hero h1{font-size:38px;margin:8px 0}.hero p{color:#aab4d6}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:24px}.card{border:1px solid #252d50;border-radius:18px;padding:22px;background:#0c1020}.icon{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,#00bfff,#7c3aed);font-size:25px}.card h2{margin:15px 0 6px}.muted{color:#8791b5;font-size:14px;line-height:1.5}.row{display:flex;justify-content:space-between;align-items:center;margin-top:20px}.badge{font-size:11px;color:#8fe3ff;border:1px solid #245b78;border-radius:999px;padding:5px 9px}.switch{appearance:none;width:42px;height:23px;border-radius:20px;background:#2a3150;position:relative;cursor:pointer}.switch:checked{background:var(--sb-accent,#167ab1)}.switch:after{content:"";position:absolute;width:17px;height:17px;border-radius:50%;background:white;left:3px;top:3px;transition:.2s}.switch:checked:after{left:22px}.cfg{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}.cfg:hover{background:#1c2446}.empty{color:#8791b5;text-align:center;padding:50px} </style>
+</head>
+<body><main class="wrap"><section class="hero"><div class="brand">SATURNIUMBROWSER</div><h1>🧩 Extensões</h1><p>Personalize e expanda seu navegador. As extensões usam permissões controladas pelo Saturnium Extension Core.</p></section><section id="grid" class="grid"></section></main>
+<script>
+const api=window.saturniumExtensions;
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+async function load(){
+  const list=await api.list();const grid=document.getElementById('grid');
+  if(!list.length){grid.innerHTML='<div class="empty">Nenhuma extensão instalada.</div>';return}
+  grid.innerHTML=list.map(e=>`<article class="card"><div class="icon">🪐</div><h2>${escapeHtml(e.name)}</h2><div class="muted">${escapeHtml(e.description||'Extensão Saturnium')}<br><br>v${escapeHtml(e.version)} • ${escapeHtml(e.author||'Saturnium')}</div><div class="row"><span class="badge">${e.permissions.length} permissões</span><span style="display:flex;gap:12px;align-items:center">${e.hasSettings&&e.enabled?`<button class="cfg" data-id="${escapeHtml(e.id)}">Configurar</button>`:''}<input class="switch" type="checkbox" ${e.enabled?'checked':''} data-id="${escapeHtml(e.id)}"></span></div></article>`).join('');
+  document.querySelectorAll('.switch').forEach(x=>x.addEventListener('change',async()=>{await api.setEnabled(x.dataset.id,x.checked);load()}));
+  document.querySelectorAll('.cfg').forEach(x=>x.addEventListener('click',()=>api.openSettings(x.dataset.id)));
+}
+load();
+</script></body></html>

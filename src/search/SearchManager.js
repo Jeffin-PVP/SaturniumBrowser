@@ -1,22 +1,29 @@
 // =====================================================
-// SearchManager
+// SearchManager - SaturniumBrowser 1.1.3
 //
-// Busca resultados por trás dos panos (via o endpoint
-// HTML público do DuckDuckGo, sem chave de API) e devolve
-// uma lista simples de { title, url, snippet }.
+// Provedor principal: Bing Search RSS.
 //
-// O SaturniumBrowser desenha esses resultados com sua própria
-// interface (saturnium://search) — o usuário nunca visita o
-// site de busca de terceiros diretamente.
+// O mecanismo antigo dependia do HTML público do
+// DuckDuckGo (html.duckduckgo.com). Esse endpoint pode
+// responder com desafios anti-bot em vez dos resultados.
+//
+// Aqui consumimos um feed RSS de busca, sem depender do
+// HTML da página de resultados do DuckDuckGo.
+//
+// Retorno padronizado:
+//   { title, url, snippet }
 // =====================================================
 
-const ENDPOINT =
-    "https://html.duckduckgo.com/html/";
+const { net } = require("electron");
+
+const SEARCH_ENDPOINT =
+    "https://www.bing.com/search";
 
 const USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
     "AppleWebKit/537.36 (KHTML, like Gecko) " +
-    "Chrome/124.0.0.0 Safari/537.36";
+    "Chrome/124.0.0.0 Safari/537.36 " +
+    "SaturniumBrowser/1.1.3";
 
 
 class SearchManager {
@@ -28,7 +35,7 @@ class SearchManager {
     async search(query) {
 
         const trimmed =
-            (query || "").trim();
+            String(query || "").trim();
 
 
         if (!trimmed) {
@@ -37,96 +44,86 @@ class SearchManager {
         }
 
 
-        const url =
-            `${ENDPOINT}?q=${encodeURIComponent(trimmed)}`;
-
-
-        const response =
-            await fetch(url, {
-
-                method: "GET",
-
-                headers: {
-
-                    "User-Agent": USER_AGENT,
-
-                    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"
-
-                }
-
+        const params =
+            new URLSearchParams({
+                format: "rss",
+                q: trimmed
             });
 
 
-        if (!response.ok) {
+        const url =
+            `${SEARCH_ENDPOINT}?${params.toString()}`;
 
-            throw new Error(
-                `Busca falhou com status ${response.status}`
-            );
+
+        let response;
+
+
+        try {
+
+            response =
+                await net.fetch(url, {
+
+                    method: "GET",
+
+                    headers: {
+                        "User-Agent": USER_AGENT,
+                        "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+                        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+                        "Cache-Control": "no-cache"
+                    }
+
+                });
+
+        } catch (error) {
+
+            const wrapped =
+                new Error(
+                    `Não foi possível acessar o provedor de busca: ${error?.message || "erro de rede"}`
+                );
+
+            wrapped.code = "SEARCH_NETWORK_ERROR";
+
+            throw wrapped;
 
         }
 
 
-        const html =
+        if (!response.ok) {
+
+            const error =
+                new Error(
+                    `O provedor de busca respondeu HTTP ${response.status}.`
+                );
+
+            error.code = "SEARCH_HTTP_ERROR";
+            error.status = response.status;
+
+            throw error;
+
+        }
+
+
+        const xml =
             await response.text();
 
 
-        return this.parseResults(html);
-
-    }
-
-
-    // ==========================================
-    // EXTRAIR OS RESULTADOS DO HTML
-    // ==========================================
-
-    parseResults(html) {
-
-        const results = [];
+        const results =
+            this.parseRSS(xml);
 
 
-        const resultRegex =
-            /<a rel="nofollow" class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+        // Evita mostrar uma página aparentemente vazia
+        // quando o provedor devolve algo que não é um RSS
+        // de resultados.
+        if (!results.length) {
 
-
-        let match;
-
-        while (
-            (match = resultRegex.exec(html)) !== null
-        ) {
-
-            const realUrl =
-                this.extractRealUrl(
-                    match[1]
+            const error =
+                new Error(
+                    "O provedor de busca não retornou resultados reconhecíveis."
                 );
 
+            error.code = "SEARCH_EMPTY";
 
-            if (!realUrl) {
-
-                continue;
-            }
-
-
-            const title =
-                this.stripTags(
-                    match[2]
-                );
-
-            const snippet =
-                this.stripTags(
-                    match[3]
-                );
-
-
-            results.push({
-
-                title:
-                    title || realUrl,
-
-                url: realUrl,
-
-                snippet
-
-            });
+            throw error;
 
         }
 
@@ -137,86 +134,685 @@ class SearchManager {
 
 
     // ==========================================
-    // DECODIFICAR A URL REAL
-    // (o DuckDuckGo envolve os links num
-    // redirecionador próprio: /l/?uddg=...)
+    // PARSER RSS
     // ==========================================
 
-    extractRealUrl(href) {
+    parseRSS(xml) {
 
-        try {
-
-            const full =
-                href.startsWith("//")
-                    ? "https:" + href
-                    : href;
-
-            const parsed =
-                new URL(full);
-
-            const wrapped =
-                parsed.searchParams.get("uddg");
+        const results = [];
 
 
-            if (wrapped) {
+        if (!xml || typeof xml !== "string") {
 
-                return decodeURIComponent(
-                    wrapped
-                );
+            return results;
+        }
 
+
+        const itemRegex =
+            /<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi;
+
+
+        let itemMatch;
+
+
+        while (
+            (itemMatch = itemRegex.exec(xml)) !== null
+        ) {
+
+            const item =
+                itemMatch[1];
+
+
+            const title =
+                this.getTagValue(item, "title");
+
+            const link =
+                this.getTagValue(item, "link");
+
+            const description =
+                this.getTagValue(item, "description");
+
+
+            if (!link) {
+
+                continue;
             }
 
 
-            return full;
+            let realUrl =
+                this.decodeEntities(link).trim();
+
+
+            // RSS pode retornar CDATA ou caracteres escapados.
+            realUrl =
+                realUrl
+                    .replace(/^<!\[CDATA\[/i, "")
+                    .replace(/\]\]>$/i, "")
+                    .trim();
+
+
+            try {
+
+                realUrl =
+                    new URL(realUrl).toString();
+
+            } catch {
+
+                continue;
+            }
+
+
+            const cleanTitle =
+                this.stripTagsAndDecode(
+                    title
+                );
+
+            const cleanSnippet =
+                this.stripTagsAndDecode(
+                    description
+                );
+
+
+            results.push({
+
+                title:
+                    cleanTitle || realUrl,
+
+                url:
+                    realUrl,
+
+                snippet:
+                    cleanSnippet
+
+            });
+
+
+            // Mantém a interface original simples e rápida.
+            if (results.length >= 10) {
+
+                break;
+            }
+
+        }
+
+
+        return results;
+
+    }
+
+
+    // ==========================================
+    // HTTP GENÉRICO (texto)
+    // ==========================================
+
+    async fetchText(url, accept, extraHeaders = {}) {
+
+        let response;
+
+        try {
+
+            response =
+                await net.fetch(url, {
+
+                    method: "GET",
+
+                    headers: {
+                        "User-Agent": USER_AGENT,
+                        "Accept": accept || "*/*",
+                        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+                        "Cache-Control": "no-cache",
+                        ...extraHeaders
+                    }
+
+                });
 
         } catch (error) {
 
-            return null;
+            const wrapped =
+                new Error(
+                    `Não foi possível acessar o provedor de busca: ${error?.message || "erro de rede"}`
+                );
 
+            wrapped.code = "SEARCH_NETWORK_ERROR";
+
+            throw wrapped;
+
+        }
+
+        if (!response.ok) {
+
+            const error =
+                new Error(
+                    `O provedor de busca respondeu HTTP ${response.status}.`
+                );
+
+            error.code = "SEARCH_HTTP_ERROR";
+            error.status = response.status;
+
+            throw error;
+
+        }
+
+        return response.text();
+
+    }
+
+
+    // ==========================================
+    // DISPATCH POR ABA (tudo, imagens, vídeos...)
+    // ==========================================
+
+    async searchByType(type, query) {
+
+        switch (type) {
+
+            case "images":
+                return this.searchImages(query);
+
+            case "videos":
+                return this.searchVideos(query);
+
+            case "news":
+                return this.searchNews(query);
+
+            case "maps":
+                return this.searchMaps(query);
+
+            default:
+                return this.search(query);
         }
 
     }
 
 
     // ==========================================
-    // LIMPAR TAGS HTML E DECODIFICAR ENTIDADES
+    // IMAGENS (Bing images async — HTML parcial)
     // ==========================================
 
-    stripTags(html) {
+    async searchImages(query) {
 
-        const withoutTags =
-            html.replace(
-                /<[^>]*>/g,
-                ""
+        const trimmed = String(query || "").trim();
+
+        if (!trimmed) return [];
+
+        const params =
+            new URLSearchParams({
+                q: trimmed,
+                first: "0",
+                count: "42",
+                mmasync: "1",
+                setlang: "pt-BR"
+            });
+
+        const html =
+            await this.fetchText(
+                `https://www.bing.com/images/async?${params.toString()}`,
+                "text/html,*/*"
+            );
+
+        const items = [];
+        const seen = new Set();
+
+        for (const data of this.extractJsonAttributes(html, ["m"])) {
+
+            const full = data.murl;
+            const thumb = data.turl || data.murl;
+            const page = data.purl;
+
+            if (!this.isHttp(thumb) || !this.isHttp(page)) continue;
+
+            if (seen.has(thumb)) continue;
+            seen.add(thumb);
+
+            items.push({
+                title: this.stripTagsAndDecode(data.t || data.desc || ""),
+                thumb,
+                full: this.isHttp(full) ? full : thumb,
+                url: page
+            });
+
+            if (items.length >= 40) break;
+        }
+
+        if (!items.length) {
+
+            const error =
+                new Error("Nenhuma imagem reconhecida na resposta.");
+
+            error.code = "SEARCH_EMPTY";
+
+            throw error;
+        }
+
+        return items;
+
+    }
+
+
+    // ==========================================
+    // VÍDEOS
+    // 1) Bing videos async (HTML parcial)
+    // 2) Fallback: busca web restrita a sites de
+    //    vídeo (RSS, mais estável) + miniatura do
+    //    YouTube quando o link é do YouTube.
+    // ==========================================
+
+    async searchVideos(query) {
+
+        const trimmed = String(query || "").trim();
+
+        if (!trimmed) return [];
+
+        let items = [];
+
+        try {
+
+            const params =
+                new URLSearchParams({
+                    q: trimmed,
+                    async: "content",
+                    first: "0",
+                    count: "30",
+                    setlang: "pt-BR"
+                });
+
+            const html =
+                await this.fetchText(
+                    `https://www.bing.com/videos/asyncv2?${params.toString()}`,
+                    "text/html,*/*"
+                );
+
+            const seen = new Set();
+
+            for (const data of this.extractJsonAttributes(html, ["vrhm", "m"])) {
+
+                const page = data.pgurl || data.purl || data.murl;
+                const thumb = data.turl || "";
+
+                if (!this.isHttp(page) || seen.has(page)) continue;
+                seen.add(page);
+
+                items.push({
+                    title: this.stripTagsAndDecode(data.vt || data.t || data.name || ""),
+                    thumb: this.isHttp(thumb) ? thumb : this.youtubeThumb(page),
+                    url: page,
+                    duration: data.du || data.dur || "",
+                    source: this.hostOf(page)
+                });
+
+                if (items.length >= 24) break;
+            }
+
+        } catch (error) {
+
+            items = [];
+        }
+
+        if (items.length) return items;
+
+
+        const fallback =
+            await this.search(
+                `${trimmed} (site:youtube.com OR site:vimeo.com OR site:dailymotion.com OR site:tiktok.com)`
+            );
+
+        return fallback.map((r) => ({
+            title: r.title,
+            thumb: this.youtubeThumb(r.url),
+            url: r.url,
+            duration: "",
+            source: this.hostOf(r.url),
+            snippet: r.snippet
+        }));
+
+    }
+
+
+    // ==========================================
+    // NOTÍCIAS (Bing News RSS)
+    // ==========================================
+
+    async searchNews(query) {
+
+        const trimmed = String(query || "").trim();
+
+        if (!trimmed) return [];
+
+        const params =
+            new URLSearchParams({
+                q: trimmed,
+                format: "rss",
+                setlang: "pt-BR",
+                cc: "BR"
+            });
+
+        const xml =
+            await this.fetchText(
+                `https://www.bing.com/news/search?${params.toString()}`,
+                "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+            );
+
+        const items = [];
+
+        const itemRegex =
+            /<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi;
+
+        let m;
+
+        while ((m = itemRegex.exec(xml)) !== null) {
+
+            const block = m[1];
+
+            let link =
+                this.decodeEntities(this.getTagValue(block, "link")).trim();
+
+            // Os links do Bing News passam por apiclick.aspx?...&url=REAL
+            try {
+
+                const parsed = new URL(link);
+
+                const real = parsed.searchParams.get("url");
+
+                if (real) link = real;
+
+            } catch (e) {}
+
+            if (!this.isHttp(link)) continue;
+
+            const image =
+                this.decodeEntities(this.getTagValue(block, "News:Image")).trim();
+
+            items.push({
+                title: this.stripTagsAndDecode(this.getTagValue(block, "title")) || link,
+                url: link,
+                snippet: this.stripTagsAndDecode(this.getTagValue(block, "description")),
+                source: this.stripTagsAndDecode(this.getTagValue(block, "News:Source")) || this.hostOf(link),
+                date: this.getTagValue(block, "pubDate"),
+                image: this.isHttp(image) ? image : ""
+            });
+
+            if (items.length >= 20) break;
+        }
+
+        if (!items.length) {
+
+            const error =
+                new Error("O provedor de notícias não retornou resultados.");
+
+            error.code = "SEARCH_EMPTY";
+
+            throw error;
+        }
+
+        return items;
+
+    }
+
+
+    // ==========================================
+    // MAPS (OpenStreetMap / Nominatim)
+    // ==========================================
+
+    async searchMaps(query) {
+
+        const trimmed = String(query || "").trim();
+
+        if (!trimmed) return [];
+
+        const params =
+            new URLSearchParams({
+                q: trimmed,
+                format: "jsonv2",
+                limit: "8",
+                addressdetails: "1",
+                "accept-language": "pt-BR"
+            });
+
+        const text =
+            await this.fetchText(
+                `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+                "application/json"
+            );
+
+        let data;
+
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            data = [];
+        }
+
+        const places = [];
+
+        for (const p of Array.isArray(data) ? data : []) {
+
+            const lat = Number(p.lat);
+            const lon = Number(p.lon);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+            const bb = Array.isArray(p.boundingbox) ? p.boundingbox.map(Number) : [];
+
+            places.push({
+                name: p.name || String(p.display_name || "").split(",")[0] || trimmed,
+                address: p.display_name || "",
+                category: p.type || p.category || "",
+                lat,
+                lon,
+                // [sul, norte, oeste, leste] -> bbox do OSM: oeste,sul,leste,norte
+                bbox: bb.length === 4 && bb.every(Number.isFinite)
+                    ? [bb[2], bb[0], bb[3], bb[1]]
+                    : null
+            });
+        }
+
+        if (!places.length) {
+
+            const error =
+                new Error("Nenhum lugar encontrado.");
+
+            error.code = "SEARCH_EMPTY";
+
+            throw error;
+        }
+
+        return places;
+
+    }
+
+
+    // ==========================================
+    // AUXILIARES
+    // ==========================================
+
+    isHttp(value) {
+
+        try {
+
+            const u = new URL(String(value || ""));
+
+            return u.protocol === "http:" || u.protocol === "https:";
+
+        } catch (e) {
+
+            return false;
+        }
+
+    }
+
+    hostOf(value) {
+
+        try {
+
+            return new URL(value).hostname.replace(/^www\./, "");
+
+        } catch (e) {
+
+            return "";
+        }
+
+    }
+
+    youtubeThumb(url) {
+
+        try {
+
+            const u = new URL(url);
+
+            let id = "";
+
+            if (/(^|\.)youtube\.com$/i.test(u.hostname)) {
+
+                id = u.searchParams.get("v") || "";
+
+                if (!id) {
+                    const m = /^\/(?:shorts|embed|live)\/([\w-]{6,})/.exec(u.pathname);
+                    if (m) id = m[1];
+                }
+
+            } else if (/(^|\.)youtu\.be$/i.test(u.hostname)) {
+
+                id = u.pathname.replace(/^\//, "").split("/")[0];
+            }
+
+            return /^[\w-]{6,}$/.test(id)
+                ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+                : "";
+
+        } catch (e) {
+
+            return "";
+        }
+
+    }
+
+    // Lê atributos HTML com JSON (ex.: m="{&quot;murl&quot;:...}")
+    extractJsonAttributes(html, names) {
+
+        const out = [];
+
+        if (!html || typeof html !== "string") return out;
+
+        const re =
+            new RegExp(
+                `\\s(?:${names.join("|")})\\s*=\\s*(?:"(\\{[^"]*\\})"|'(\\{[^']*\\})')`,
+                "g"
+            );
+
+        let m;
+
+        while ((m = re.exec(html)) !== null) {
+
+            const raw = this.decodeEntities(m[1] || m[2] || "");
+
+            try {
+
+                const data = JSON.parse(raw);
+
+                if (data && typeof data === "object") out.push(data);
+
+            } catch (e) {}
+        }
+
+        return out;
+
+    }
+
+
+    // ==========================================
+    // LER TAG XML SIMPLES
+    // ==========================================
+
+    getTagValue(xml, tagName) {
+
+        const regex =
+            new RegExp(
+                `<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}>`,
+                "i"
             );
 
 
+        const match =
+            regex.exec(xml);
+
+
+        if (!match) {
+
+            return "";
+        }
+
+
+        return match[1]
+            .trim()
+            .replace(/^<!\[CDATA\[/i, "")
+            .replace(/\]\]>$/i, "")
+            .trim();
+
+    }
+
+
+    // ==========================================
+    // LIMPAR HTML + ENTIDADES XML/HTML
+    // ==========================================
+
+    stripTagsAndDecode(value) {
+
         return this.decodeEntities(
-            withoutTags
-        ).trim();
+            String(value || "")
+                .replace(/<[^>]*>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+        );
 
     }
 
 
     decodeEntities(text) {
 
-        return text
+        return String(text || "")
 
-            .replace(/&amp;/g, "&")
-
-            .replace(/&lt;/g, "<")
-
-            .replace(/&gt;/g, ">")
-
-            .replace(/&quot;/g, "\"")
-
-            .replace(/&#0?39;/g, "'")
-
-            .replace(/&#x27;/g, "'")
-
+            .replace(/&amp;/gi, "&")
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/&quot;/gi, '"')
+            .replace(/&apos;/gi, "'")
+            .replace(/&#0?39;/gi, "'")
+            .replace(/&#x27;/gi, "'")
             .replace(/&#x2f;/gi, "/")
+            .replace(/&#x2F;/g, "/")
+            .replace(/&#(\d+);/g, (full, value) => {
 
-            .replace(/&nbsp;/g, " ");
+                const code =
+                    Number(value);
+
+                if (!Number.isFinite(code)) {
+                    return full;
+                }
+
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return full;
+                }
+
+            })
+            .replace(/&#x([0-9a-f]+);/gi, (full, hex) => {
+
+                const code =
+                    parseInt(hex, 16);
+
+                if (!Number.isFinite(code)) {
+                    return full;
+                }
+
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return full;
+                }
+
+            })
+            .replace(/&nbsp;/gi, " ");
 
     }
 

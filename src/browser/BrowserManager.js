@@ -18,12 +18,27 @@ const SearchManager =
 const SecurityManager =
     require("../security/SecurityManager");
 
+const AIManager =
+    require("../ai/AIManager");
+
+
+const ExtensionManager = require("../extensions/ExtensionManager");
 
 class BrowserManager {
 
     constructor(window) {
 
         this.window = window;
+
+        this.extensions = new ExtensionManager({
+            getWindow: () => this.window,
+            getInternalContents: () =>
+                this.tabManager
+                    ? this.tabManager.tabs
+                        .filter(tab => tab.internal)
+                        .map(tab => tab.view.webContents)
+                    : []
+        });
 
         // =====================================
         // GERENCIADOR DE HISTÓRICO
@@ -39,6 +54,12 @@ class BrowserManager {
         this.search = new SearchManager();
 
         // =====================================
+        // SATURNIUM AI
+        // =====================================
+
+        this.ai = new AIManager();
+
+        // =====================================
         // SEGURANÇA
         // =====================================
 
@@ -52,6 +73,10 @@ class BrowserManager {
             new TabManager(
                 window,
                 {
+
+                    onInternalPageLoaded: (webContents) => {
+                        this.extensions.host.applyTo(webContents);
+                    },
 
                     onNavigate: (url, title, favicon) => {
                         this.history.add(url, title, favicon);
@@ -84,6 +109,9 @@ class BrowserManager {
 
                     performSearch: (query) =>
                         this.search.search(query),
+
+                    performSearchTab: (type, query) =>
+                        this.runSearchTab(type, query),
 
                     checkUrlSafety: (url) =>
                         this.security.check(url),
@@ -154,6 +182,8 @@ class BrowserManager {
     // =====================================
 
     initialize() {
+
+        this.extensions.initialize();
 
         this.tabManager.createTab();
 
@@ -384,6 +414,122 @@ class BrowserManager {
     openDownloads() {
 
         this.tabManager.openDownloads();
+
+    }
+
+
+    openExtensions() {
+
+        this.tabManager.openExtensions();
+
+    }
+
+    openAI() {
+
+        return this.tabManager.openAI();
+
+    }
+
+    // =====================================
+    // BUSCA POR ABA (Tudo / Modo IA /
+    // Imagens / Vídeos / Notícias / Maps)
+    // =====================================
+
+    async runSearchTab(type, query) {
+
+        if (type === "ai") {
+
+            return this.answerWithAI(query);
+        }
+
+        return this.search.searchByType(type, query);
+
+    }
+
+    // Modo IA: busca na web, entrega as melhores fontes ao
+    // modelo configurado e devolve resposta + fontes numeradas.
+    async answerWithAI(query) {
+
+        const sources =
+            (await this.search.search(query)).slice(0, 6);
+
+        const context =
+            sources
+                .map((s, i) =>
+                    `[${i + 1}] ${s.title}\n${s.url}\n${(s.snippet || "").slice(0, 400)}`
+                )
+                .join("\n\n");
+
+        const messages = [
+            {
+                role: "system",
+                content:
+                    "Você é o Modo IA do SaturniumBrowser. Responda em português do Brasil, " +
+                    "de forma direta e organizada, usando APENAS as fontes fornecidas. " +
+                    "Cite as fontes no texto como [1], [2]. Se as fontes não bastarem, " +
+                    "diga isso claramente em vez de inventar. Sem enrolação."
+            },
+            {
+                role: "user",
+                content:
+                    `Pergunta: ${String(query).slice(0, 500)}\n\nFontes:\n${context}`.slice(0, 11500)
+            }
+        ];
+
+        let reply;
+
+        try {
+
+            reply =
+                await this.ai.chat(
+                    messages,
+                    { temperature: 0.3, maxTokens: 900 }
+                );
+
+        } catch (error) {
+
+            const wrapped =
+                new Error(error?.message || "AI_ERROR");
+
+            wrapped.code = "AI_ERROR";
+            wrapped.sources = sources;
+
+            throw wrapped;
+        }
+
+        return {
+            answer: reply.content,
+            provider: reply.provider,
+            model: reply.model,
+            sources
+        };
+
+    }
+
+
+    isAIWebContents(webContents) {
+
+        return this.tabManager.isAIWebContents(webContents);
+
+    }
+
+    isExtensionsWebContents(webContents) {
+
+        return this.tabManager.isExtensionsWebContents(webContents);
+
+    }
+
+    openExtensionSettings(id) {
+
+        const file = this.extensions.settingsFile(id);
+
+        if (!file) {
+            return false;
+        }
+
+        this.tabManager.openExtensionPage(id, file);
+
+        return true;
 
     }
 

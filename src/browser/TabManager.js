@@ -41,11 +41,40 @@ const SEARCH_PAGE = path.join(
     "search.html"
 );
 
+const EXTENSIONS_PAGE = path.join(
+    __dirname,
+    "..",
+    "..",
+    "extensions.html"
+);
+
 const BLOCKED_PAGE = path.join(
     __dirname,
     "..",
     "..",
     "blocked.html"
+);
+
+const AI_PAGE = path.join(
+    __dirname,
+    "..",
+    "..",
+    "saturnium-ai.html"
+);
+
+const AI_PRELOAD = path.join(
+    __dirname,
+    "..",
+    "internal",
+    "internal-preload.js"
+);
+
+
+const EXT_PRELOAD = path.join(
+    __dirname,
+    "..",
+    "extensions",
+    "extensions-preload.js"
 );
 
 
@@ -98,11 +127,19 @@ class TabManager {
         this.performSearch =
             callbacks.performSearch || null;
 
+        this.performSearchTab =
+            callbacks.performSearchTab || null;
+
         this.checkUrlSafety =
             callbacks.checkUrlSafety || null;
 
         this.allowUrlOnce =
             callbacks.allowUrlOnce || null;
+
+        // Chamado quando uma página interna termina de carregar
+        // (usado para aplicar temas de extensões).
+        this.onInternalPageLoaded =
+            callbacks.onInternalPageLoaded || null;
 
         this.tabs = [];
 
@@ -132,10 +169,14 @@ class TabManager {
     // CRIAR ABA
     // =====================================
 
-    createTab(url = null) {
+    createTab(url = null, options = {}) {
 
         const id = this.nextTabId++;
 
+        const aiPreload = options.ai === true || /^saturnium:\/\/ai(?:\?|$)/i.test(url || "");
+
+
+        const extPreload = options.extensions === true;
 
         const view = new WebContentsView({
 
@@ -145,7 +186,11 @@ class TabManager {
 
                 nodeIntegration: false,
 
-                sandbox: true
+                sandbox: true,
+
+                ...(aiPreload ? { preload: AI_PRELOAD } : {}),
+
+                ...(extPreload ? { preload: EXT_PRELOAD } : {})
 
             }
 
@@ -168,7 +213,11 @@ class TabManager {
 
             loading: false,
 
-            pinned: false
+            pinned: false,
+
+            aiPreload,
+
+            extPreload
 
         };
 
@@ -185,6 +234,25 @@ class TabManager {
 
 
         this.setupEvents(tab);
+
+
+        view.webContents.on(
+            "did-finish-load",
+            () => {
+
+                if (
+                    tab.internal &&
+                    typeof this.onInternalPageLoaded === "function"
+                ) {
+
+                    this.onInternalPageLoaded(
+                        view.webContents
+                    );
+
+                }
+
+            }
+        );
 
 
         // =================================
@@ -1137,12 +1205,23 @@ class TabManager {
             const query =
                 options.query || "";
 
+            const VALID_TABS =
+                ["all", "ai", "images", "videos", "news", "maps"];
+
+            const searchTab =
+                VALID_TABS.includes(options.tab)
+                    ? options.tab
+                    : "all";
+
 
             tab.internal = true;
 
-            tab.url =
+            const searchUrl =
                 "saturnium://search?q=" +
-                encodeURIComponent(query);
+                encodeURIComponent(query) +
+                (searchTab !== "all" ? "&tab=" + searchTab : "");
+
+            tab.url = searchUrl;
 
             tab.title =
                 query
@@ -1162,26 +1241,66 @@ class TabManager {
                     // Mostra o estado de
                     // carregamento imediatamente
                     tab.view.webContents.executeJavaScript(
-                        `window.renderSearchLoading(${JSON.stringify(query)})`
+                        `window.renderSearchLoading(${JSON.stringify({ query, tab: searchTab })})`
                     ).catch(() => {});
 
 
                     let results = [];
 
+                    let aiData = null;
+
                     let error = null;
+
+                    let sources = null;
 
 
                     try {
 
-                        results =
-                            typeof this.performSearch === "function"
-                                ? await this.performSearch(query)
-                                : [];
+                        if (
+                            searchTab !== "all" &&
+                            typeof this.performSearchTab === "function"
+                        ) {
+
+                            const data =
+                                await this.performSearchTab(searchTab, query);
+
+                            if (searchTab === "ai") {
+
+                                aiData = data;
+                                sources = data.sources;
+
+                            } else {
+
+                                results = data;
+                            }
+
+                        } else if (typeof this.performSearch === "function") {
+
+                            results = await this.performSearch(query);
+                        }
 
                     } catch (searchError) {
 
-                        error =
-                            "Não foi possível buscar agora. Verifique sua conexão e tente novamente.";
+                        sources =
+                            Array.isArray(searchError && searchError.sources)
+                                ? searchError.sources
+                                : null;
+
+                        if (searchTab === "ai" && searchError && searchError.code === "AI_ERROR") {
+
+                            error =
+                                "O Modo IA não conseguiu responder. Configure um provedor em saturnium://ai (⚙ Configurar) e tente de novo. " +
+                                "Detalhe: " + String(searchError.message || "").slice(0, 200);
+
+                        } else if (searchError && searchError.code === "SEARCH_EMPTY") {
+
+                            error = "Nenhum resultado encontrado.";
+
+                        } else {
+
+                            error =
+                                "Não foi possível buscar agora. Verifique sua conexão e tente novamente.";
+                        }
 
                     }
 
@@ -1189,17 +1308,14 @@ class TabManager {
                     // A aba pode ter navegado
                     // para outro lugar enquanto
                     // a busca acontecia.
-                    if (
-                        tab.url !==
-                        "saturnium://search?q=" + encodeURIComponent(query)
-                    ) {
+                    if (tab.url !== searchUrl) {
 
                         return;
                     }
 
 
                     tab.view.webContents.executeJavaScript(
-                        `window.renderSearchResults(${JSON.stringify({ query, results, error })})`
+                        `window.renderSearchResults(${JSON.stringify({ query, tab: searchTab, results, ai: aiData, sources, error })})`
                     ).catch(() => {});
 
                 }
@@ -1210,6 +1326,43 @@ class TabManager {
 
             this.sendTabs();
 
+            return;
+        }
+
+
+        if (page === "ai") {
+
+            tab.internal = true;
+            tab.url = "saturnium://ai";
+            tab.title = "SaturniumAI - SaturniumBrowser";
+
+            // O preload seguro é definido na criação da WebContentsView.
+            // Aqui usamos o protocolo interno para manter uma origem única.
+            tab.view.webContents.loadURL("saturnium://ai");
+
+            this.sendTabUpdate(tab);
+            this.sendTabs();
+            return;
+        }
+
+
+        if (page === "extensions") {
+
+            // A página de extensões precisa do preload seguro, que só
+            // pode ser definido na criação da view. Se a aba atual não
+            // tem, abrimos em uma aba nova.
+            if (!tab.extPreload) {
+                this.openExtensions();
+                return;
+            }
+
+            tab.internal = true;
+            tab.url = "saturnium://extensions";
+            tab.title = "Extensões - SaturniumBrowser";
+
+            tab.view.webContents.loadURL("saturnium://extensions");
+            this.sendTabUpdate(tab);
+            this.sendTabs();
             return;
         }
 
@@ -1288,6 +1441,80 @@ class TabManager {
             "downloads"
         );
 
+    }
+
+
+    openExtensions() {
+
+        const tab = this.createTab(null, { extensions: true });
+
+        tab.internal = true;
+        tab.url = "saturnium://extensions";
+        tab.title = "Extensões - SaturniumBrowser";
+        tab.view.webContents.loadURL("saturnium://extensions");
+        this.sendTabUpdate(tab);
+        this.sendTabs();
+
+        return tab;
+    }
+
+    // Página de configurações de uma extensão (saturnium://ext/<id>/<arquivo>)
+    openExtensionPage(id, file) {
+
+        const url = "saturnium://ext/" + encodeURIComponent(id) + "/" + file;
+
+        const tab = this.createTab(null, { extensions: true });
+
+        tab.internal = true;
+        tab.url = url;
+        tab.title = "Extensão - SaturniumBrowser";
+        tab.view.webContents.loadURL(url);
+        this.sendTabUpdate(tab);
+        this.sendTabs();
+
+        return tab;
+    }
+
+    // Verificação de remetente para IPC (evita que páginas web
+    // comuns chamem handlers privilegiados).
+    isAIWebContents(webContents) {
+
+        return this.tabs.some(
+            tab =>
+                tab.aiPreload &&
+                tab.view.webContents === webContents &&
+                /^saturnium:\/\/ai(?:[/?#]|$)/i.test(
+                    webContents.getURL()
+                )
+        );
+
+    }
+
+    isExtensionsWebContents(webContents) {
+
+        return this.tabs.some(
+            tab =>
+                tab.extPreload &&
+                tab.view.webContents === webContents &&
+                /^saturnium:\/\/(?:extensions|ext)(?:[/?#]|$)/i.test(
+                    webContents.getURL()
+                )
+        );
+
+    }
+
+    openAI() {
+
+        const tab = this.createTab(null, { ai: true });
+
+        tab.internal = true;
+        tab.url = "saturnium://ai";
+        tab.title = "SaturniumAI - SaturniumBrowser";
+        tab.view.webContents.loadURL("saturnium://ai");
+        this.sendTabUpdate(tab);
+        this.sendTabs();
+
+        return tab;
     }
 
 
@@ -1373,6 +1600,8 @@ class TabManager {
 
                 let query = "";
 
+                let searchTabParam = "all";
+
                 try {
 
                     const parsedSearch =
@@ -1381,6 +1610,10 @@ class TabManager {
                     query =
                         parsedSearch.searchParams.get("q") ||
                         "";
+
+                    searchTabParam =
+                        parsedSearch.searchParams.get("tab") ||
+                        "all";
 
                 } catch (error) {
 
@@ -1391,7 +1624,7 @@ class TabManager {
 
                 this.openInternalPage(
                     "search",
-                    { query }
+                    { query, tab: searchTabParam }
                 );
 
                 return;
@@ -1510,6 +1743,29 @@ class TabManager {
                     "history"
                 );
 
+                return;
+            }
+
+
+            if (page === "ai") {
+
+            tab.internal = true;
+            tab.url = "saturnium://ai";
+            tab.title = "SaturniumAI - SaturniumBrowser";
+
+            // O preload seguro é definido na criação da WebContentsView.
+            // Aqui usamos o protocolo interno para manter uma origem única.
+            tab.view.webContents.loadURL("saturnium://ai");
+
+            this.sendTabUpdate(tab);
+            this.sendTabs();
+            return;
+        }
+
+
+        if (page === "extensions") {
+
+                this.openInternalPage("extensions");
                 return;
             }
 

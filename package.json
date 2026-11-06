@@ -1,48 +1,48 @@
 {
-  "name": "saturniumbrowser",
-  "version": "1.1.1",
-  "description": "Navegador personalizado SaturniumBrowser",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "electron": "^44.1.0",
-    "electron-builder": "^26.15.3"
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.9"
-  },
-  "build": {
-    "appId": "com.saturnium.browser",
-    "productName": "SaturniumBrowser",
-    "directories": {
-      "output": "dist"
+    "name": "saturniumbrowser",
+    "version": "1.2.1",
+    "description": "Navegador personalizado SaturniumBrowser",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --win",
+        "release": "electron-builder --win --publish always"
     },
-    "files": [
-      "**/*"
-    ],
-    "icon": "assets/saturniumbrowser-ico.ico",
-    "win": {
-      "target": "nsis",
-      "icon": "assets/saturniumbrowser-ico.ico"
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "electron": "^44.1.0",
+        "electron-builder": "^26.15.3"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "SaturniumBrowser"
+    "dependencies": {
+        "electron-updater": "^6.8.9"
     },
-    "publish": {
-      "provider": "github",
-      "owner": "Jeffin-PVP",
-      "repo": "SaturniumBrowser"
+    "build": {
+        "appId": "com.saturnium.browser",
+        "productName": "SaturniumBrowser",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "**/*"
+        ],
+        "icon": "assets/saturniumbrowser-ico.ico",
+        "win": {
+            "target": "nsis",
+            "icon": "assets/saturniumbrowser-ico.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "SaturniumBrowser"
+        },
+        "publish": {
+            "provider": "github",
+            "owner": "Jeffin-PVP",
+            "repo": "SaturniumBrowser"
+        }
     }
-  }
 }

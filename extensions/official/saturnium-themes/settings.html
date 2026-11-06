@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Temas - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh}
+.wrap{max-width:980px;margin:auto;padding:40px}
+h1{margin:0 0 6px;font-size:32px}
+.sub{color:#8791b5;margin:0 0 28px}
+h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#79d8ff;margin:34px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{border:2px solid #252d50;border-radius:16px;padding:12px;background:#0c1020;cursor:pointer;transition:.15s;color:inherit;font:inherit;text-align:left}
+.card:hover{border-color:#3b4780}
+.card.active{border-color:var(--sb-accent,#7c5cff);box-shadow:0 0 0 3px #7c5cff22}
+.swatch{display:flex;height:46px;border-radius:10px;overflow:hidden;margin-bottom:10px}
+.swatch span{flex:1}
+.wall{height:70px;border-radius:10px;margin-bottom:10px;background:#111}
+.name{font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+input[type=color]{width:54px;height:40px;border:none;border-radius:10px;background:none;padding:0;cursor:pointer}
+button.act{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+button.act:hover{background:#1c2446}
+button.danger{border-color:#5c2a38}
+.msg{color:#ff9aa8;font-size:13px;margin-top:10px;min-height:18px}
+.muted{color:#8791b5;font-size:13px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>🎨 Saturnium Themes</h1>
+  <p class="sub">As mudanças são aplicadas na hora e salvas automaticamente.</p>
+
+  <h2>Tema</h2>
+  <div id="themes" class="grid"></div>
+
+  <h2>Cor de destaque</h2>
+  <div class="row">
+    <input id="accent" type="color" value="#7c5cff">
+    <button id="accent-reset" class="act">Usar a do tema</button>
+  </div>
+
+  <h2>Papel de parede da nova aba</h2>
+  <div id="walls" class="grid"></div>
+  <div class="row" style="margin-top:14px">
+    <button id="pick" class="act">Escolher imagem…</button>
+    <button id="wall-none" class="act">Sem papel de parede</button>
+    <span id="custom-flag" class="muted"></span>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <h2>Restaurar</h2>
+  <button id="reset" class="act danger">Restaurar padrão</button>
+</main>
+<script>
+const ID = "saturnium.themes";
+const call = (m, a) => window.saturniumExtensions.call(ID, m, a);
+let state = null;
+
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function say(t){document.getElementById("msg").textContent = t || ""}
+
+function render(){
+  document.getElementById("themes").innerHTML = state.themes.map(t =>
+    `<button class="card ${t.id===state.themeId?"active":""}" data-theme="${esc(t.id)}">
+       <div class="swatch">${t.colors.map(c=>`<span style="background:${esc(c)}"></span>`).join("")}</div>
+       <div class="name">${esc(t.name)}</div></button>`).join("");
+  document.getElementById("walls").innerHTML = state.wallpapers.map(w =>
+    `<button class="card ${w.id===state.wallpaperId?"active":""}" data-wall="${esc(w.id)}">
+       <div class="wall" style="background:linear-gradient(${Number(w.angle)}deg,${w.colors.map(esc).join(",")})"></div>
+       <div class="name">${esc(w.name)}</div></button>`).join("");
+  document.getElementById("custom-flag").textContent = state.hasCustomImage ? "Imagem personalizada em uso" : "";
+  if (state.accent) document.getElementById("accent").value = state.accent;
+}
+
+async function run(method, arg){
+  try { say(""); state = await call(method, arg); render(); }
+  catch (e) { say((e && e.message || "Erro").replace(/^Error invoking remote method '[^']*': (Error: )?/, "")); }
+}
+
+document.getElementById("themes").addEventListener("click", e => {
+  const b = e.target.closest("[data-theme]"); if (b) run("setTheme", b.dataset.theme);
+});
+document.getElementById("walls").addEventListener("click", e => {
+  const b = e.target.closest("[data-wall]"); if (b) run("setWallpaper", b.dataset.wall);
+});
+document.getElementById("accent").addEventListener("change", e => run("setAccent", e.target.value));
+document.getElementById("accent-reset").addEventListener("click", () => run("setAccent", null));
+document.getElementById("pick").addEventListener("click", () => run("pickWallpaper"));
+document.getElementById("wall-none").addEventListener("click", () => run("setWallpaper", null));
+document.getElementById("reset").addEventListener("click", () => run("reset"));
+
+run("getState");
+</script>
+</body>
+</html>
