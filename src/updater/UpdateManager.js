@@ -26,11 +26,25 @@ class UpdateManager {
         // Baixa automaticamente quando uma nova versão é encontrada.
         autoUpdater.autoDownload = true;
 
-        // A instalação será iniciada somente quando o usuário clicar
-        // em "Reiniciar e atualizar".
-        autoUpdater.autoInstallEvent = "manual";
+        // Se o usuário não clicar em "Reiniciar e atualizar", a versão
+        // baixada é instalada ao fechar o navegador.
+        autoUpdater.autoInstallOnAppQuit = true;
+
+        // Aceita releases marcadas como "pre-release" no GitHub?
+        // (por padrão o electron-updater ignora essas releases)
+        autoUpdater.allowPrerelease = false;
 
         this.setupLogger();
+
+        // Joga o log interno do electron-updater (URL consultada,
+        // 404 do latest.yml, 403, etc.) no updater.log.
+        autoUpdater.logger = {
+            info: (m) => this.log("INFO", `[electron-updater] ${m}`),
+            warn: (m) => this.log("WARN", `[electron-updater] ${m}`),
+            error: (m) => this.log("ERROR", `[electron-updater] ${m}`),
+            debug: (m) => this.log("DEBUG", `[electron-updater] ${m}`)
+        };
+
         this.setupEvents();
 
         this.log(
@@ -295,6 +309,35 @@ class UpdateManager {
             channel,
             data
         );
+
+    }
+
+
+    // =====================================
+    // VERIFICAÇÃO PERIÓDICA
+    // (o app pode ficar aberto por dias)
+    // =====================================
+
+    startPeriodicChecks(intervalMs = 30 * 60 * 1000) {
+
+        if (this.periodicTimer) {
+            return;
+        }
+
+        this.periodicTimer = setInterval(() => {
+
+            // Já baixou? Não precisa checar de novo.
+            if (this.updateDownloaded) {
+                return;
+            }
+
+            this.checkForUpdates(false);
+
+        }, intervalMs);
+
+        if (this.periodicTimer.unref) {
+            this.periodicTimer.unref();
+        }
 
     }
 

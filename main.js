@@ -112,6 +112,7 @@ function createWindow() {
 
         setTimeout(() => {
             updateManager.checkForUpdates();
+            updateManager.startPeriodicChecks();
         }, 5000);
 
     } else {
