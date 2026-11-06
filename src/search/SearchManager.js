@@ -44,91 +44,272 @@ class SearchManager {
         }
 
 
+        // Provedores em ordem. Cada um só é aceito se os
+        // resultados tiverem relação com o que foi buscado.
+        const providers = [
+            ["Bing RSS",  () => this.searchBingRss(trimmed)],
+            ["Mojeek",    () => this.searchMojeek(trimmed)],
+            ["Bing HTML", () => this.searchBingHtml(trimmed)]
+        ];
+
+        let networkError = null;
+
+        for (const [name, run] of providers) {
+
+            try {
+
+                const results = await run();
+
+                if (!results.length) {
+
+                    console.warn(`[Search] ${name}: sem resultados reconhecíveis.`);
+
+                    continue;
+                }
+
+                if (!this.looksRelevant(trimmed, results)) {
+
+                    console.warn(
+                        `[Search] ${name}: resultados sem relação com "${trimmed}" (ex.: ${results[0].url}). Descartado.`
+                    );
+
+                    continue;
+                }
+
+                return results;
+
+            } catch (error) {
+
+                console.warn(`[Search] ${name} falhou:`, error?.message || error);
+
+                if (
+                    !networkError &&
+                    (error?.code === "SEARCH_NETWORK_ERROR" ||
+                     error?.code === "SEARCH_HTTP_ERROR")
+                ) {
+                    networkError = error;
+                }
+            }
+        }
+
+        if (networkError) {
+
+            throw networkError;
+        }
+
+        const error =
+            new Error(
+                "O provedor de busca não retornou resultados reconhecíveis."
+            );
+
+        error.code = "SEARCH_EMPTY";
+
+        throw error;
+
+    }
+
+
+    // ==========================================
+    // PROVEDORES
+    // ==========================================
+
+    async searchBingRss(query) {
+
         const params =
             new URLSearchParams({
                 format: "rss",
-                q: trimmed
+                q: query
             });
 
+        const xml =
+            await this.fetchText(
+                `${SEARCH_ENDPOINT}?${params.toString()}`,
+                "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+            );
 
-        const url =
-            `${SEARCH_ENDPOINT}?${params.toString()}`;
+        return this.parseRSS(xml);
+
+    }
+
+    async searchBingHtml(query) {
+
+        const params =
+            new URLSearchParams({
+                q: query,
+                setlang: "pt-BR"
+            });
+
+        const html =
+            await this.fetchText(
+                `${SEARCH_ENDPOINT}?${params.toString()}`,
+                "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
+            );
+
+        return this.parseBingHtml(html);
+
+    }
+
+    async searchMojeek(query) {
+
+        const params =
+            new URLSearchParams({
+                q: query,
+                lb: "pt"
+            });
+
+        const html =
+            await this.fetchText(
+                `https://www.mojeek.com/search?${params.toString()}`,
+                "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
+            );
+
+        return this.parseMojeek(html);
+
+    }
+
+    parseMojeek(html) {
+
+        const results = [];
+
+        if (!html || typeof html !== "string") return results;
+
+        const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+
+        let m;
+
+        while ((m = liRegex.exec(html)) !== null) {
+
+            const block = m[1];
+
+            const link =
+                /<a[^>]*class="[^"]*\btitle\b[^"]*"[^>]*\shref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block) ||
+                /<a[^>]*\shref="([^"]+)"[^>]*class="[^"]*\btitle\b[^"]*"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
+
+            if (!link) continue;
+
+            const url = this.decodeEntities(link[1]);
+
+            if (!this.isHttp(url)) continue;
+
+            const snip =
+                /<p[^>]*class="[^"]*\bs\b[^"]*"[^>]*>([\s\S]*?)<\/p>/i.exec(block);
+
+            results.push({
+                title: this.stripTagsAndDecode(link[2]) || url,
+                url,
+                snippet: snip ? this.stripTagsAndDecode(snip[1]) : ""
+            });
+
+            if (results.length >= 20) break;
+        }
+
+        return results;
+
+    }
 
 
-        let response;
+    // ==========================================
+    // RELEVÂNCIA: pelo menos um termo da busca
+    // aparece em algum resultado (sem acento).
+    // Evita mostrar resultados aleatórios.
+    // ==========================================
 
+    looksRelevant(query, results) {
+
+        const fold = (t) =>
+            String(t || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase();
+
+        const terms =
+            fold(query)
+                .split(/[^a-z0-9]+/)
+                .filter((t) => t.length >= 3);
+
+        if (!terms.length) return true;
+
+        return results.some((r) => {
+
+            const hay = fold(`${r.title} ${r.snippet} ${r.url}`);
+
+            return terms.some((t) => hay.includes(t));
+        });
+
+    }
+
+
+    // ==========================================
+    // PLANO B: HTML do Bing (li.b_algo)
+    // ==========================================
+
+    parseBingHtml(html) {
+
+        const results = [];
+
+        if (!html || typeof html !== "string") return results;
+
+        const blockRegex =
+            /<li\s+class="b_algo[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+
+        let m;
+
+        while ((m = blockRegex.exec(html)) !== null) {
+
+            const block = m[1];
+
+            const link =
+                /<h2[^>]*>\s*<a[^>]*\shref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
+
+            if (!link) continue;
+
+            const url =
+                this.unwrapBingUrl(this.decodeEntities(link[1]));
+
+            if (!this.isHttp(url)) continue;
+
+            const snip =
+                /<p[^>]*>([\s\S]*?)<\/p>/i.exec(block);
+
+            results.push({
+                title: this.stripTagsAndDecode(link[2]) || url,
+                url,
+                snippet: snip ? this.stripTagsAndDecode(snip[1]) : ""
+            });
+
+            if (results.length >= 20) break;
+        }
+
+        return results;
+
+    }
+
+    // Links do Bing às vezes vêm como bing.com/ck/a?...&u=a1<base64>
+    unwrapBingUrl(url) {
 
         try {
 
-            response =
-                await net.fetch(url, {
+            const parsed = new URL(url);
 
-                    method: "GET",
+            if (/(^|\.)bing\.com$/i.test(parsed.hostname) && parsed.pathname.startsWith("/ck/")) {
 
-                    headers: {
-                        "User-Agent": USER_AGENT,
-                        "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-                        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-                        "Cache-Control": "no-cache"
-                    }
+                const u = parsed.searchParams.get("u") || "";
 
-                });
+                if (u.startsWith("a1")) {
 
-        } catch (error) {
+                    const decoded =
+                        Buffer.from(
+                            u.slice(2).replace(/-/g, "+").replace(/_/g, "/"),
+                            "base64"
+                        ).toString("utf8");
 
-            const wrapped =
-                new Error(
-                    `Não foi possível acessar o provedor de busca: ${error?.message || "erro de rede"}`
-                );
+                    if (this.isHttp(decoded)) return decoded;
+                }
+            }
 
-            wrapped.code = "SEARCH_NETWORK_ERROR";
+        } catch (e) {}
 
-            throw wrapped;
-
-        }
-
-
-        if (!response.ok) {
-
-            const error =
-                new Error(
-                    `O provedor de busca respondeu HTTP ${response.status}.`
-                );
-
-            error.code = "SEARCH_HTTP_ERROR";
-            error.status = response.status;
-
-            throw error;
-
-        }
-
-
-        const xml =
-            await response.text();
-
-
-        const results =
-            this.parseRSS(xml);
-
-
-        // Evita mostrar uma página aparentemente vazia
-        // quando o provedor devolve algo que não é um RSS
-        // de resultados.
-        if (!results.length) {
-
-            const error =
-                new Error(
-                    "O provedor de busca não retornou resultados reconhecíveis."
-                );
-
-            error.code = "SEARCH_EMPTY";
-
-            throw error;
-
-        }
-
-
-        return results;
+        return url;
 
     }
 
@@ -255,6 +436,8 @@ class SearchManager {
                 await net.fetch(url, {
 
                     method: "GET",
+
+                    credentials: "omit",
 
                     headers: {
                         "User-Agent": USER_AGENT,
@@ -771,6 +954,11 @@ class SearchManager {
 
         return String(text || "")
 
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&ndash;/gi, "–")
+            .replace(/&mdash;/gi, "—")
+            .replace(/&hellip;/gi, "…")
+            .replace(/&middot;/gi, "·")
             .replace(/&amp;/gi, "&")
             .replace(/&lt;/gi, "<")
             .replace(/&gt;/gi, ">")

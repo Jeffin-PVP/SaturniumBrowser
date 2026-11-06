@@ -1294,7 +1294,8 @@ class TabManager {
 
                         } else if (searchError && searchError.code === "SEARCH_EMPTY") {
 
-                            error = "Nenhum resultado encontrado.";
+                            error =
+                                "A busca não retornou resultados agora. O provedor pode estar limitando as consultas — tente de novo em instantes.";
 
                         } else {
 
