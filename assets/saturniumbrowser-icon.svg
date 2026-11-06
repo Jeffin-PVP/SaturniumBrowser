@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<defs>
+<linearGradient id="gMain" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#22D3FF"/><stop offset=".5" stop-color="#4F6BFF"/><stop offset="1" stop-color="#9B5CFF"/>
+</linearGradient>
+<linearGradient id="gPlanet" x1=".15" y1=".05" x2=".85" y2="1">
+  <stop offset="0" stop-color="#2FC8FF"/><stop offset=".45" stop-color="#3D5BFF"/><stop offset="1" stop-color="#7A3FF2"/>
+</linearGradient>
+<linearGradient id="gRing" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#22D3FF"/><stop offset=".55" stop-color="#6C7BFF"/><stop offset="1" stop-color="#C77DFF"/>
+</linearGradient>
+<linearGradient id="gShine" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="gText" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#22D3FF"/><stop offset=".55" stop-color="#5B6CFF"/><stop offset="1" stop-color="#9B5CFF"/>
+</linearGradient>
+
+  <clipPath id="clipBack"><rect x="-300" y="-200" width="600" height="200"/></clipPath>
+  <clipPath id="clipFront"><rect x="-300" y="0" width="600" height="200"/></clipPath>
+  <clipPath id="planetClip"><circle cx="200" cy="200" r="108"/></clipPath>
+  <mask id="planetMask" maskUnits="userSpaceOnUse" x="0" y="0" width="400" height="400">
+    <rect width="400" height="400" fill="#fff"/>
+    <g transform="translate(200 200) rotate(-24)" clip-path="url(#clipFront)">
+      <ellipse rx="196" ry="58" fill="none" stroke="#000" stroke-width="34"/>
+    </g>
+  </mask>
+</defs>
+<!-- anel traseiro -->
+<g transform="translate(200 200) rotate(-24)">
+  <g clip-path="url(#clipBack)">
+    <ellipse rx="196" ry="58" fill="none" stroke="url(#gRing)" stroke-width="15"/>
+  </g>
+</g>
+<!-- planeta -->
+<g mask="url(#planetMask)">
+  <circle cx="200" cy="200" r="108" fill="url(#gPlanet)"/>
+  <g clip-path="url(#planetClip)">
+    <path d="M110 150 C150 90 240 80 300 120 C250 118 175 130 110 150Z" fill="url(#gShine)"/>
+    <ellipse cx="262" cy="278" rx="120" ry="70" fill="#7A3FF2" opacity=".35" transform="rotate(-24 262 278)"/>
+    <path d="M96 232 C150 262 230 258 306 214" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="5" stroke-linecap="round"/>
+    <path d="M100 200 C160 226 240 220 308 180" fill="none" stroke="#fff" stroke-opacity=".10" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</g>
+<!-- anel frontal -->
+<g transform="translate(200 200) rotate(-24)">
+  <g clip-path="url(#clipFront)">
+    <ellipse rx="196" ry="58" fill="none" stroke="url(#gRing)" stroke-width="15"/>
+  </g>
+</g>
+<path d="M318 64 Q322.84 81.16 340 86 Q322.84 90.84 318 108 Q313.16 90.84 296 86 Q313.16 81.16 318 64Z" fill="#7FE6FF"/>
+<path d="M356 310 Q358.64 319.36 368 322 Q358.64 324.64 356 334 Q353.36 324.64 344 322 Q353.36 319.36 356 310Z" fill="#B39DFF"/>
+</svg>
