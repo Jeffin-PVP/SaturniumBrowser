@@ -1,0 +1,11 @@
+{
+  "name": "Saturnium Zoom",
+  "id": "saturnium.zoom",
+  "version": "1.0.0",
+  "description": "Lembra um nível de zoom diferente para cada site.",
+  "author": "Saturnium",
+  "icon": "🔍",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": ["pages.zoom", "tabs.read", "storage"]
+}

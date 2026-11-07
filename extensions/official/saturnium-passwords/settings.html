@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Passwords - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh}
+.wrap{max-width:980px;margin:auto;padding:40px}
+h1{margin:0 0 6px;font-size:32px}
+.sub{color:#8791b5;margin:0 0 28px}
+h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#79d8ff;margin:34px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{border:2px solid #252d50;border-radius:16px;padding:14px;background:#0c1020;cursor:pointer;transition:.15s;color:inherit;font:inherit;text-align:left}
+.card:hover{border-color:#3b4780}
+.card.active{border-color:var(--sb-accent,#7c5cff);box-shadow:0 0 0 3px #7c5cff22}
+.name{font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+input[type=text],input[type=number],textarea{background:#0c1020;border:1px solid #2d3563;color:#eef2ff;border-radius:10px;padding:10px 12px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--sb-accent,#7c5cff)}
+button.act{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+button.act:hover{background:#1c2446}
+button.danger{border-color:#5c2a38}
+.msg{color:#ff9aa8;font-size:13px;margin-top:10px;min-height:18px}
+.muted{color:#8791b5;font-size:13px}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0c1020;border:1px solid #252d50;border-radius:12px;padding:10px 14px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <h1>🔐 Saturnium Passwords</h1>
+  <p class="sub">Suas senhas ficam criptografadas (AES-256 + senha mestra) neste computador. Nada sai daqui.</p>
+
+  <section id="lock-setup" class="center" style="display:none">
+    <h2 style="margin-top:0">Criar cofre</h2>
+    <p class="muted">Escolha uma senha mestra forte. <b>Não existe recuperação</b>: se você esquecer, os dados não podem ser abertos.</p>
+    <input id="m1" type="password" placeholder="Senha mestra" autocomplete="off">
+    <input id="m2" type="password" placeholder="Repita a senha mestra" autocomplete="off">
+    <button id="create" class="act">Criar cofre</button>
+  </section>
+
+  <section id="lock-unlock" class="center" style="display:none">
+    <h2 style="margin-top:0">Cofre bloqueado</h2>
+    <input id="mu" type="password" placeholder="Senha mestra" autocomplete="off">
+    <button id="unlock" class="act">Desbloquear</button>
+  </section>
+
+  <section id="main" style="display:none">
+    <div class="row" style="margin-bottom:14px">
+      <input id="q" type="text" placeholder="Buscar…" style="flex:1;min-width:180px">
+      <button id="add" class="act">+ Nova senha</button>
+      <button id="gen" class="act">Gerador</button>
+      <button id="import" class="act">Importar CSV</button>
+      <button id="chg" class="act">Trocar senha mestra</button>
+      <button id="lock" class="act danger">Bloquear</button>
+      <input id="file" type="file" accept=".csv,text/csv" style="display:none">
+    </div>
+    <div id="hint" class="muted" style="margin-bottom:10px"></div>
+    <div id="list" class="list"></div>
+  </section>
+  <div id="msg" class="msg"></div>
+
+  <div id="ed" class="modal"><div class="box">
+    <h2 style="margin-top:0" id="ed-title">Nova senha</h2>
+    <label>Título</label><input id="e-title" type="text" maxlength="120">
+    <label>Site (ex.: github.com)</label><input id="e-site" type="text" maxlength="253">
+    <label>Usuário / e-mail</label><input id="e-user" type="text" maxlength="300" autocomplete="off">
+    <label>Senha</label>
+    <div class="row" style="flex-wrap:nowrap"><input id="e-pass" type="password" maxlength="1000" autocomplete="off">
+      <button id="e-show" class="act" type="button">Ver</button><button id="e-gen" class="act" type="button">Gerar</button></div>
+    <label>Notas</label><textarea id="e-notes" rows="3" maxlength="5000"></textarea>
+    <div class="row" style="margin-top:16px;justify-content:space-between">
+      <button id="e-del" class="act danger" type="button">Excluir</button>
+      <span class="row"><button id="e-cancel" class="act" type="button">Cancelar</button><button id="e-save" class="act" type="button">Salvar</button></span>
+    </div>
+    <div id="e-msg" class="msg"></div>
+  </div></div>
+
+  <div id="gn" class="modal"><div class="box">
+    <h2 style="margin-top:0">Gerador de senhas</h2>
+    <input id="g-out" type="text" readonly style="font-family:Consolas,monospace">
+    <label>Tamanho: <span id="g-len-v">20</span></label><input id="g-len" type="range" min="8" max="64" value="20">
+    <div class="row" style="margin-top:10px">
+      <label><input type="checkbox" id="g-lower" checked> a-z</label>
+      <label><input type="checkbox" id="g-upper" checked> A-Z</label>
+      <label><input type="checkbox" id="g-digits" checked> 0-9</label>
+      <label><input type="checkbox" id="g-symbols" checked> !@#</label>
+    </div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button id="g-new" class="act" type="button">Gerar outra</button>
+      <button id="g-copy" class="act" type="button">Copiar</button>
+      <button id="g-use" class="act" type="button" style="display:none">Usar esta</button>
+      <button id="g-close" class="act" type="button">Fechar</button>
+    </div>
+  </div></div>
+
+  <div id="cm" class="modal"><div class="box">
+    <h2 style="margin-top:0">Trocar senha mestra</h2>
+    <label>Senha atual</label><input id="c-cur" type="password" autocomplete="off">
+    <label>Nova senha mestra</label><input id="c-new" type="password" autocomplete="off">
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button id="c-cancel" class="act" type="button">Cancelar</button><button id="c-ok" class="act" type="button">Trocar</button>
+    </div>
+    <div id="c-msg" class="msg"></div>
+  </div></div>
+<style>
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+.modal.open{display:flex}
+.box{background:#0c1020;border:1px solid #2d3563;border-radius:16px;padding:22px;width:min(520px,100%);max-height:90vh;overflow:auto}
+.box label{display:block;font-size:12px;color:#8791b5;margin:12px 0 4px}
+.box input,.box textarea{width:100%}
+.tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid #5c2a38;color:#ff9aa8}
+.tag.warn{border-color:#6b5a1f;color:#ffd166}
+.center{max-width:420px;margin:60px auto;text-align:center}
+.center input{width:100%;margin:8px 0}
+.match{border-color:var(--sb-accent,#7c5cff)}
+</style></main>
+<script>
+const ID="saturnium.passwords";
+const call=(m,a)=>window.saturniumExtensions.call(ID,m,a);
+let st=null, editing=null, genTarget=false;
+const $ = id => document.getElementById(id);
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function say(t){$("msg").textContent=t||""}
+function errText(e){return (e&&e.message||"Erro").replace(/^Error invoking remote method '[^']*': (Error: )?/,"")}
+
+function show(id,on){$(id).style.display=on?"":"none"}
+function render(){
+  show("lock-setup",!st.exists);
+  show("lock-unlock",st.exists&&!st.unlocked);
+  show("main",st.unlocked);
+  if(!st.unlocked){return}
+  const q=$("q").value.trim().toLowerCase();
+  const list=st.entries.filter(e=>!q||(e.title+" "+e.site+" "+e.username).toLowerCase().includes(q));
+  const cur=st.currentHost;
+  const isMatch=e=>cur&&e.site&&(cur===e.site||cur.endsWith("."+e.site));
+  list.sort((a,b)=>isMatch(b)-isMatch(a));
+  $("hint").textContent=cur?`Site da última aba aberta: ${cur}`:"";
+  $("list").innerHTML=list.length?list.map(e=>`<div class="item ${isMatch(e)?"match":""}">
+    <div><div class="name">${esc(e.title)} ${e.weak?'<span class="tag warn">fraca</span>':""} ${e.reused?'<span class="tag">repetida</span>':""}</div>
+    <div class="muted">${esc(e.username||"(sem usuário)")}${e.site?" • "+esc(e.site):""}</div></div>
+    <div class="row" style="gap:8px">
+      ${isMatch(e)?`<button class="act" data-a="fill" data-id="${esc(e.id)}">Preencher</button>`:""}
+      <button class="act" data-a="user" data-id="${esc(e.id)}">Usuário</button>
+      <button class="act" data-a="pass" data-id="${esc(e.id)}">Senha</button>
+      <button class="act" data-a="edit" data-id="${esc(e.id)}">Editar</button></div></div>`).join(""):'<div class="muted">Nenhuma senha ainda. Clique em “Nova senha” ou importe um CSV.</div>';
+}
+async function run(m,a){try{say("");st=await call(m,a);render();return st}catch(e){say(errText(e))}}
+function modal(id,on){$(id).classList.toggle("open",on)}
+
+$("create").addEventListener("click",()=>{
+  if($("m1").value!==$("m2").value){say("As senhas não conferem.");return}
+  run("setup",$("m1").value).then(()=>{$("m1").value=$("m2").value=""});
+});
+$("unlock").addEventListener("click",()=>run("unlock",$("mu").value).then(()=>{$("mu").value=""}));
+$("mu").addEventListener("keydown",e=>{if(e.key==="Enter")$("unlock").click()});
+$("lock").addEventListener("click",()=>run("lock"));
+$("q").addEventListener("input",render);
+
+$("list").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-a]");if(!b)return;const id=b.dataset.id;
+  try{say("");
+    if(b.dataset.a==="pass"){const r=await call("copyPassword",id);say(`Senha copiada. Será apagada da área de transferência em ${r.seconds}s.`)}
+    else if(b.dataset.a==="user"){await call("copyUsername",id);say("Usuário copiado.")}
+    else if(b.dataset.a==="fill"){const r=await call("fill",id);say(r.password||r.user?"Preenchido na aba do site. Confira e envie o formulário.":"Não encontrei campos de login na página.")}
+    else if(b.dataset.a==="edit"){openEditor(await call("get",id))}
+  }catch(err){say(errText(err));if(/bloqueado/.test(errText(err)))run("status")}
+});
+
+function openEditor(entry){
+  editing=entry||null;
+  $("ed-title").textContent=entry?"Editar senha":"Nova senha";
+  $("e-title").value=entry?entry.title:"";
+  $("e-site").value=entry?entry.site:(st.currentHost||"");
+  $("e-user").value=entry?entry.username:"";
+  $("e-pass").value=entry?entry.password:"";$("e-pass").type="password";$("e-show").textContent="Ver";
+  $("e-notes").value=entry?entry.notes:"";
+  $("e-del").style.display=entry?"":"none";$("e-msg").textContent="";
+  modal("ed",true);$("e-title").focus();
+}
+$("add").addEventListener("click",()=>openEditor(null));
+$("e-cancel").addEventListener("click",()=>modal("ed",false));
+$("e-show").addEventListener("click",()=>{const p=$("e-pass");const hide=p.type==="password";p.type=hide?"text":"password";$("e-show").textContent=hide?"Ocultar":"Ver"});
+$("e-save").addEventListener("click",async()=>{
+  try{st=await call("save",{id:editing&&editing.id,title:$("e-title").value,site:$("e-site").value,username:$("e-user").value,password:$("e-pass").value,notes:$("e-notes").value});render();modal("ed",false)}
+  catch(err){$("e-msg").textContent=errText(err)}
+});
+$("e-del").addEventListener("click",async()=>{
+  if(!editing||!confirm("Excluir esta senha?"))return;
+  try{st=await call("remove",editing.id);render();modal("ed",false)}catch(err){$("e-msg").textContent=errText(err)}
+});
+
+async function newPassword(){
+  try{$("g-out").value=await call("generate",{length:Number($("g-len").value),lower:$("g-lower").checked,upper:$("g-upper").checked,digits:$("g-digits").checked,symbols:$("g-symbols").checked})}
+  catch(err){say(errText(err))}
+}
+function openGen(forEditor){genTarget=forEditor;$("g-use").style.display=forEditor?"":"none";modal("gn",true);newPassword()}
+$("gen").addEventListener("click",()=>openGen(false));
+$("e-gen").addEventListener("click",()=>openGen(true));
+$("g-len").addEventListener("input",()=>{$("g-len-v").textContent=$("g-len").value;newPassword()});
+["g-lower","g-upper","g-digits","g-symbols"].forEach(i=>$(i).addEventListener("change",newPassword));
+$("g-new").addEventListener("click",newPassword);
+$("g-copy").addEventListener("click",()=>{
+  const out=$("g-out");out.select();
+  navigator.clipboard.writeText(out.value).then(()=>say("Senha gerada copiada."),()=>say("Selecione e copie manualmente (Ctrl+C)."));
+});
+$("g-use").addEventListener("click",()=>{if(genTarget){$("e-pass").value=$("g-out").value;$("e-pass").type="text";$("e-show").textContent="Ocultar"}modal("gn",false)});
+$("g-close").addEventListener("click",()=>modal("gn",false));
+
+$("chg").addEventListener("click",()=>{$("c-cur").value=$("c-new").value="";$("c-msg").textContent="";modal("cm",true)});
+$("c-cancel").addEventListener("click",()=>modal("cm",false));
+$("c-ok").addEventListener("click",async()=>{
+  try{st=await call("changeMaster",{current:$("c-cur").value,next:$("c-new").value});modal("cm",false);say("Senha mestra alterada.")}
+  catch(err){$("c-msg").textContent=errText(err)}
+});
+
+$("import").addEventListener("click",()=>$("file").click());
+$("file").addEventListener("change",async()=>{
+  const f=$("file").files[0];if(!f)return;
+  try{const text=await f.text();const r=await call("importCsv",text);st=r;render();say(`Importadas: ${r.added}. Ignoradas: ${r.skipped}. Apague o arquivo CSV depois: ele contém suas senhas em texto puro.`)}
+  catch(err){say(errText(err))}
+  $("file").value="";
+});
+
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){["ed","gn","cm"].forEach(i=>modal(i,false))}});
+run("status");
+setInterval(()=>{if(st&&st.unlocked)call("status").then(s=>{if(!s.unlocked){st=s;render();say("Cofre bloqueado por inatividade.")}else{st=s}}).catch(()=>{})},15000);
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "Saturnium Passwords",
+  "id": "saturnium.passwords",
+  "version": "1.0.0",
+  "description": "Cofre de senhas criptografado com senha mestra, gerador e preenchimento seguro.",
+  "author": "Saturnium",
+  "icon": "🔐",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": ["storage", "tabs.read", "clipboard.write", "pages.autofill"]
+}

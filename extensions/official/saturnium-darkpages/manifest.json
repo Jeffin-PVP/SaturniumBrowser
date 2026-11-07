@@ -1,0 +1,11 @@
+{
+  "name": "Saturnium Dark Pages",
+  "id": "saturnium.darkpages",
+  "version": "1.0.0",
+  "description": "Modo escuro e filtros de leitura para qualquer site, com lista de exceções.",
+  "author": "Saturnium",
+  "icon": "🌙",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": ["pages.style", "tabs.read", "storage"]
+}

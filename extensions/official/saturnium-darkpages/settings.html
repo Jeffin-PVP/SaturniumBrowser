@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dark Pages - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh}
+.wrap{max-width:980px;margin:auto;padding:40px}
+h1{margin:0 0 6px;font-size:32px}
+.sub{color:#8791b5;margin:0 0 28px}
+h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#79d8ff;margin:34px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{border:2px solid #252d50;border-radius:16px;padding:14px;background:#0c1020;cursor:pointer;transition:.15s;color:inherit;font:inherit;text-align:left}
+.card:hover{border-color:#3b4780}
+.card.active{border-color:var(--sb-accent,#7c5cff);box-shadow:0 0 0 3px #7c5cff22}
+.name{font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+input[type=text],input[type=number],textarea{background:#0c1020;border:1px solid #2d3563;color:#eef2ff;border-radius:10px;padding:10px 12px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--sb-accent,#7c5cff)}
+button.act{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+button.act:hover{background:#1c2446}
+button.danger{border-color:#5c2a38}
+.msg{color:#ff9aa8;font-size:13px;margin-top:10px;min-height:18px}
+.muted{color:#8791b5;font-size:13px}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0c1020;border:1px solid #252d50;border-radius:12px;padding:10px 14px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <h1>🌙 Saturnium Dark Pages</h1>
+  <p class="sub">Aplica um filtro em todos os sites que você visita. As mudanças valem na hora e ficam salvas.</p>
+
+  <h2>Filtro</h2>
+  <div id="presets" class="grid"></div>
+
+  <h2>Sites ignorados</h2>
+  <p class="muted">Sites que já têm tema escuro próprio ficam melhores sem o filtro. Subdomínios também são ignorados.</p>
+  <div class="row" style="margin:12px 0">
+    <input id="host" type="text" placeholder="exemplo.com" size="28">
+    <button id="add" class="act">Ignorar este site</button>
+    <button id="add-current" class="act" style="display:none"></button>
+  </div>
+  <div id="excluded" class="list"></div>
+  <div id="msg" class="msg"></div>
+
+  <h2>Restaurar</h2>
+  <button id="reset" class="act danger">Desligar e limpar tudo</button>
+</main>
+<script>
+const ID="saturnium.darkpages";
+const call=(m,a)=>window.saturniumExtensions.call(ID,m,a);
+let state=null;
+const $ = id => document.getElementById(id);
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function say(t){$("msg").textContent=t||""}
+function errText(e){return (e&&e.message||"Erro").replace(/^Error invoking remote method '[^']*': (Error: )?/,"")}
+
+function render(){
+  $("presets").innerHTML=
+    `<button class="card ${state.preset===null?"active":""}" data-p=""><div class="name">Desligado</div></button>`+
+    state.presets.map(p=>`<button class="card ${p.id===state.preset?"active":""}" data-p="${esc(p.id)}"><div class="name">${esc(p.name)}</div></button>`).join("");
+  $("excluded").innerHTML=state.exclude.length
+    ? state.exclude.map(h=>`<div class="item"><span>${esc(h)}</span><button class="act" data-rm="${esc(h)}">Remover</button></div>`).join("")
+    : '<div class="muted">Nenhum site ignorado.</div>';
+  const b=$("add-current");
+  if(state.currentHost && !state.exclude.includes(state.currentHost)){b.style.display="";b.textContent="Ignorar "+state.currentHost;b.dataset.h=state.currentHost}
+  else b.style.display="none";
+}
+async function run(m,a){try{say("");state=await call(m,a);render()}catch(e){say(errText(e))}}
+$("presets").addEventListener("click",e=>{const b=e.target.closest("[data-p]");if(b)run("setPreset",b.dataset.p||null)});
+$("excluded").addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(b)run("include",b.dataset.rm)});
+$("add").addEventListener("click",()=>{const i=$("host");run("exclude",i.value);i.value=""});
+$("add-current").addEventListener("click",e=>run("exclude",e.currentTarget.dataset.h));
+$("reset").addEventListener("click",()=>run("reset"));
+run("getState");
+</script>
+</body>
+</html>

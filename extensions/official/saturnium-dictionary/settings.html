@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dictionary - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh}
+.wrap{max-width:980px;margin:auto;padding:40px}
+h1{margin:0 0 6px;font-size:32px}
+.sub{color:#8791b5;margin:0 0 28px}
+h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#79d8ff;margin:34px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{border:2px solid #252d50;border-radius:16px;padding:14px;background:#0c1020;cursor:pointer;transition:.15s;color:inherit;font:inherit;text-align:left}
+.card:hover{border-color:#3b4780}
+.card.active{border-color:var(--sb-accent,#7c5cff);box-shadow:0 0 0 3px #7c5cff22}
+.name{font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+input[type=text],input[type=number],textarea{background:#0c1020;border:1px solid #2d3563;color:#eef2ff;border-radius:10px;padding:10px 12px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--sb-accent,#7c5cff)}
+button.act{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+button.act:hover{background:#1c2446}
+button.danger{border-color:#5c2a38}
+.msg{color:#ff9aa8;font-size:13px;margin-top:10px;min-height:18px}
+.muted{color:#8791b5;font-size:13px}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0c1020;border:1px solid #252d50;border-radius:12px;padding:10px 14px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <h1>📖 Saturnium Dictionary</h1>
+  <p class="sub">Dica: em qualquer site, selecione uma palavra, clique com o botão direito e escolha “Definir”.</p>
+
+  <div class="row" style="margin-bottom:8px">
+    <input id="word" type="text" placeholder="Digite uma palavra…" size="30" maxlength="60" autofocus>
+    <select id="lang" style="background:#0c1020;color:#eef2ff;border:1px solid #2d3563;border-radius:10px;padding:10px 12px;font:inherit"></select>
+    <button id="go" class="act">Buscar</button>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <div id="result"></div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px">
+    <div><h2>Palavras salvas</h2><div id="saved" class="list"></div></div>
+    <div><h2>Recentes <button id="clear" class="act" style="padding:4px 10px;font-size:12px;margin-left:8px;text-transform:none;letter-spacing:0">Limpar</button></h2><div id="history" class="list"></div></div>
+  </div>
+<style>
+.entry{background:#0c1020;border:1px solid #252d50;border-radius:16px;padding:20px;margin:18px 0}
+.entry h3{margin:0;font-size:28px}
+.pos{color:#79d8ff;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:16px 0 6px}
+.entry ol{margin:0;padding-left:22px}.entry li{margin:8px 0;line-height:1.5}
+.ex{color:#8791b5;font-style:italic;font-size:13px}
+.syn{color:#8791b5;font-size:13px;margin-top:6px}
+.extract{white-space:pre-wrap;line-height:1.55;color:#cfd6f5}
+.chip{cursor:pointer;text-align:left}
+</style>
+</main>
+<script>
+const ID="saturnium.dictionary";
+const call=(m,a)=>window.saturniumExtensions.call(ID,m,a);
+let st=null, current=null;
+const $ = id => document.getElementById(id);
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function say(t){$("msg").textContent=t||""}
+function errText(e){return (e&&e.message||"Erro").replace(/^Error invoking remote method '[^']*': (Error: )?/,"")}
+
+function renderLists(){
+  $("lang").innerHTML=st.langs.map(l=>`<option value="${esc(l.id)}" ${l.id===st.lang?"selected":""}>${esc(l.name)}</option>`).join("");
+  const chips=(arr)=>arr.length?arr.map(w=>`<div class="item"><button class="act chip" data-w="${esc(w)}" style="border:none;background:none;padding:0">${esc(w)}</button></div>`).join(""):'<div class="muted">Vazio.</div>';
+  $("saved").innerHTML=chips(st.saved);$("history").innerHTML=chips(st.history);
+}
+function renderResult(r){
+  if(!r){$("result").innerHTML="";return}
+  if(!r.found){$("result").innerHTML=`<div class="entry"><div class="name">Não encontrei “${esc(r.word)}”.</div><p class="muted">Confira a grafia ou troque o idioma ao lado do campo de busca.</p></div>`;return}
+  const meanings=r.meanings.map(m=>`<div class="pos">${esc(m.pos||"")}</div><ol>${m.definitions.map(d=>`<li>${esc(d.text)}${d.example?`<div class="ex">“${esc(d.example)}”</div>`:""}</li>`).join("")}</ol>${m.synonyms.length?`<div class="syn">Sinônimos: ${m.synonyms.map(esc).join(", ")}</div>`:""}`).join("");
+  $("result").innerHTML=`<div class="entry"><div class="row" style="justify-content:space-between"><div><h3>${esc(r.word)}</h3>${r.phonetic?`<div class="muted">${esc(r.phonetic)}</div>`:""}</div>
+    <button id="star" class="act">${r.isSaved?"★ Salva":"☆ Salvar palavra"}</button></div>
+    ${meanings}${r.extract?`<div class="extract">${esc(r.extract)}</div>`:""}</div>`;
+  $("star").addEventListener("click",async()=>{try{st=await call("toggleSaved",r.word);r.isSaved=!r.isSaved;renderLists();renderResult(r)}catch(e){say(errText(e))}});
+}
+async function search(w){
+  w=(w||$("word").value).trim();if(!w)return;
+  $("word").value=w;say("Buscando…");$("result").innerHTML="";
+  try{const r=await call("lookup",{word:w,lang:$("lang").value});say("");st=r.state;current=r;renderLists();renderResult(r)}
+  catch(e){say(errText(e))}
+}
+$("go").addEventListener("click",()=>search());
+$("word").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
+$("lang").addEventListener("change",async()=>{try{st=await call("setLang",$("lang").value);if($("word").value.trim())search()}catch(e){say(errText(e))}});
+document.addEventListener("click",e=>{const c=e.target.closest("[data-w]");if(c)search(c.dataset.w)});
+$("clear").addEventListener("click",async()=>{try{st=await call("clearHistory");renderLists()}catch(e){say(errText(e))}});
+(async()=>{
+  try{st=await call("getState");renderLists();
+    const q=new URLSearchParams(location.search).get("q");if(q)search(q);
+  }catch(e){say(errText(e))}
+})();
+</script>
+</body>
+</html>

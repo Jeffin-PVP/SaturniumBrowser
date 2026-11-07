@@ -1,0 +1,11 @@
+{
+  "name": "Saturnium Notes",
+  "id": "saturnium.notes",
+  "version": "1.0.0",
+  "description": "Bloco de notas rápido dentro do navegador, salvo automaticamente.",
+  "author": "Saturnium",
+  "icon": "📝",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": ["storage"]
+}

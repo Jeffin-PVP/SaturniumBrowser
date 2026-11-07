@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Notes - SaturniumBrowser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--sb-content-bg,#070914);color:#eef2ff;min-height:100vh}
+.wrap{max-width:1100px;margin:auto;padding:40px}
+h1{margin:0 0 6px;font-size:32px}
+.sub{color:#8791b5;margin:0 0 28px}
+h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#79d8ff;margin:34px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{border:2px solid #252d50;border-radius:16px;padding:14px;background:#0c1020;cursor:pointer;transition:.15s;color:inherit;font:inherit;text-align:left}
+.card:hover{border-color:#3b4780}
+.card.active{border-color:var(--sb-accent,#7c5cff);box-shadow:0 0 0 3px #7c5cff22}
+.name{font-size:14px;font-weight:600}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+input[type=text],input[type=number],textarea{background:#0c1020;border:1px solid #2d3563;color:#eef2ff;border-radius:10px;padding:10px 12px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--sb-accent,#7c5cff)}
+button.act{border:1px solid #2d3563;background:#141a33;color:#eef2ff;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+button.act:hover{background:#1c2446}
+button.danger{border-color:#5c2a38}
+.msg{color:#ff9aa8;font-size:13px;margin-top:10px;min-height:18px}
+.muted{color:#8791b5;font-size:13px}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0c1020;border:1px solid #252d50;border-radius:12px;padding:10px 14px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <h1>📝 Saturnium Notes</h1>
+  <p class="sub">Tudo é salvo automaticamente enquanto você digita.</p>
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start">
+    <aside>
+      <div class="row" style="margin-bottom:12px;flex-wrap:nowrap">
+        <button id="new" class="act">+ Nova nota</button>
+        <input id="q" type="text" placeholder="Buscar…" style="flex:1;min-width:0">
+      </div>
+      <div id="list" class="list"></div>
+    </aside>
+    <section id="editor" style="display:none">
+      <input id="title" type="text" placeholder="Título" maxlength="120" style="width:100%;font-size:20px;font-weight:600;margin-bottom:10px">
+      <textarea id="body" maxlength="50000" style="width:100%;height:55vh;resize:vertical;line-height:1.5" placeholder="Escreva aqui…"></textarea>
+      <div class="row" style="margin-top:10px;justify-content:space-between">
+        <span id="saved" class="muted"></span>
+        <button id="del" class="act danger">Excluir nota</button>
+      </div>
+    </section>
+    <section id="empty" class="muted">Crie ou escolha uma nota para começar.</section>
+  </div>
+  <div id="msg" class="msg"></div>
+</main>
+<script>
+const ID="saturnium.notes";
+const call=(m,a)=>window.saturniumExtensions.call(ID,m,a);
+let notes=[],current=null,timer=null;
+const $ = id => document.getElementById(id);
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function say(t){$("msg").textContent=t||""}
+function errText(e){return (e&&e.message||"Erro").replace(/^Error invoking remote method '[^']*': (Error: )?/,"")}
+
+const preview=n=>esc((n.title||n.body.split("\n")[0]||"Nota sem título").slice(0,60));
+function renderList(){
+  const q=$("q").value.trim().toLowerCase();
+  const shown=notes.filter(n=>!q||(n.title+" "+n.body).toLowerCase().includes(q));
+  $("list").innerHTML=shown.length?shown.map(n=>`<button class="card ${n.id===current?"active":""}" data-id="${esc(n.id)}"><div class="name">${preview(n)}</div><div class="muted">${new Date(n.updated).toLocaleString("pt-BR")}</div></button>`).join(""):'<div class="muted">Nenhuma nota.</div>';
+}
+async function flush(){
+  if(!timer)return;clearTimeout(timer);timer=null;
+  const n=notes.find(x=>x.id===current);if(!n)return;
+  try{n.updated=await call("update",{id:n.id,title:n.title,body:n.body});$("saved").textContent="Salvo ✓";renderList()}catch(e){say(errText(e))}
+}
+async function open(id){
+  await flush();
+  current=id;const n=notes.find(x=>x.id===id);
+  $("editor").style.display=n?"":"none";$("empty").style.display=n?"none":"";
+  if(n){$("title").value=n.title;$("body").value=n.body;$("saved").textContent=""}
+  renderList();
+}
+function edited(){
+  const n=notes.find(x=>x.id===current);if(!n)return;
+  n.title=$("title").value;n.body=$("body").value;$("saved").textContent="Salvando…";
+  clearTimeout(timer);timer=setTimeout(flush,500);
+}
+$("title").addEventListener("input",edited);$("body").addEventListener("input",edited);
+$("q").addEventListener("input",renderList);
+$("list").addEventListener("click",e=>{const b=e.target.closest("[data-id]");if(b)open(b.dataset.id)});
+$("new").addEventListener("click",async()=>{try{await flush();say("");const r=await call("create");notes=r.notes;await open(r.id);$("title").focus()}catch(e){say(errText(e))}});
+$("del").addEventListener("click",async()=>{
+  if(!current||!confirm("Excluir esta nota?"))return;
+  try{clearTimeout(timer);timer=null;notes=await call("remove",current);current=null;await open(notes[0]&&notes[0].id)}catch(e){say(errText(e))}
+});
+window.addEventListener("beforeunload",flush);
+(async()=>{try{notes=await call("list");renderList();if(notes[0])await open(notes[0].id)}catch(e){say(errText(e))}})();
+</script>
+</body>
+</html>

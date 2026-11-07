@@ -37,7 +37,32 @@ class BrowserManager {
                     ? this.tabManager.tabs
                         .filter(tab => tab.internal)
                         .map(tab => tab.view.webContents)
-                    : []
+                    : [],
+            getWebContents: () =>
+                this.tabManager
+                    ? this.tabManager.tabs
+                        .filter(tab => !tab.internal)
+                        .map(tab => tab.view.webContents)
+                    : [],
+            // Última aba web usada: assim as páginas de configuração (que são a aba ativa)
+            // ainda conseguem se referir ao site que o usuário estava vendo.
+            getActiveWebContents: () => {
+                const tm = this.tabManager;
+                if (!tm) return null;
+                const active = tm.getActiveTab();
+                const tab = active && !active.internal
+                    ? active
+                    : tm.tabs.find(t => t.id === tm.lastWebTabId && !t.internal);
+                return tab ? tab.view.webContents : null;
+            },
+            openExtensionPage: (id, query) => {
+                const file = this.extensions.settingsFile(id);
+                if (!file || !this.tabManager) return;
+                this.tabManager.openExtensionPage(
+                    id,
+                    file + (query ? "?q=" + encodeURIComponent(query) : "")
+                );
+            }
         });
 
         // =====================================
@@ -76,6 +101,10 @@ class BrowserManager {
 
                     onInternalPageLoaded: (webContents) => {
                         this.extensions.host.applyTo(webContents);
+                    },
+
+                    onWebPageReady: (webContents) => {
+                        this.extensions.host.applyToWeb(webContents);
                     },
 
                     onNavigate: (url, title, favicon) => {

@@ -1,0 +1,11 @@
+{
+  "name": "Saturnium Miniplayer",
+  "id": "saturnium.miniplayer",
+  "version": "1.0.0",
+  "description": "Vídeo flutuante (miniplayer) para o YouTube e outros sites. Botão na página ou atalho Alt+P.",
+  "author": "Saturnium",
+  "icon": "📺",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "permissions": ["pages.pip", "tabs.read", "storage"]
+}

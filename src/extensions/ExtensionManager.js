@@ -6,13 +6,16 @@ const ExtensionLoader = require("./ExtensionLoader");
 const ExtensionHost = require("./ExtensionHost");
 
 class ExtensionManager {
-    constructor({ getWindow, getInternalContents } = {}) {
+    constructor({ getWindow, getInternalContents, getWebContents, getActiveWebContents, openExtensionPage } = {}) {
         this.root = path.join(app.getPath("userData"), "extensions");
         this.statePath = path.join(this.root, "state.json");
         this.storage = new ExtensionStorage(path.join(this.root, "storage"));
         this.host = new ExtensionHost({
             getWindow: getWindow || (() => null),
-            getInternalContents: getInternalContents || (() => [])
+            getInternalContents: getInternalContents || (() => []),
+            getWebContents: getWebContents || (() => []),
+            getActiveWebContents: getActiveWebContents || (() => null),
+            openExtensionPage
         });
         this.loader = new ExtensionLoader(this.storage, this.host);
         this.extensions = new Map();
@@ -121,7 +124,8 @@ class ExtensionManager {
             id: e.manifest.id, name: e.manifest.name, version: e.manifest.version,
             description: e.manifest.description || "", author: e.manifest.author || "Saturnium",
             permissions: e.permissions, enabled: e.enabled, source: e.source,
-            hasSettings: !!e.manifest.settings
+            hasSettings: !!e.manifest.settings,
+            icon: typeof e.manifest.icon === "string" ? e.manifest.icon.slice(0, 4) : "🪐"
         }));
     }
 }

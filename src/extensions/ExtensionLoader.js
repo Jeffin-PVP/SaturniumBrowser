@@ -8,7 +8,7 @@ class ExtensionLoader {
     load(extensionPath) {
         const manifest = ExtensionValidator.readManifest(extensionPath);
         const permissions = ExtensionPermissions.sanitize(manifest.permissions);
-        const api = new ExtensionAPI({ id: manifest.id, permissions, storage: this.storage, host: this.host });
+        const api = new ExtensionAPI({ id: manifest.id, permissions, storage: this.storage, host: this.host, hosts: manifest.hosts || [] });
         let module = null;
         if (manifest.main) {
             const entry = path.join(extensionPath, manifest.main);

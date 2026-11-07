@@ -141,6 +141,11 @@ class TabManager {
         this.onInternalPageLoaded =
             callbacks.onInternalPageLoaded || null;
 
+        // Chamado quando uma página web (aba normal) está pronta
+        // (usado para estilos e zoom de extensões).
+        this.onWebPageReady =
+            callbacks.onWebPageReady || null;
+
         this.tabs = [];
 
         this.activeTabId = null;
@@ -234,6 +239,25 @@ class TabManager {
 
 
         this.setupEvents(tab);
+
+
+        view.webContents.on(
+            "dom-ready",
+            () => {
+
+                if (
+                    !tab.internal &&
+                    typeof this.onWebPageReady === "function"
+                ) {
+
+                    this.onWebPageReady(
+                        view.webContents
+                    );
+
+                }
+
+            }
+        );
 
 
         view.webContents.on(
@@ -791,6 +815,10 @@ class TabManager {
 
 
         this.activeTabId = id;
+
+        if (!tab.internal) {
+            this.lastWebTabId = id;
+        }
 
 
         for (

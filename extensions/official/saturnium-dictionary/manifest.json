@@ -1,0 +1,12 @@
+{
+  "name": "Saturnium Dictionary",
+  "id": "saturnium.dictionary",
+  "version": "1.0.0",
+  "description": "Dicionário em português, inglês e espanhol. Selecione uma palavra, clique com o botão direito e escolha Definir.",
+  "author": "Saturnium",
+  "icon": "📖",
+  "main": "extension.js",
+  "settings": "settings.html",
+  "hosts": ["api.dictionaryapi.dev", "pt.wiktionary.org", "es.wiktionary.org"],
+  "permissions": ["storage", "network.fetch", "contextmenu.add", "ui.openpage"]
+}

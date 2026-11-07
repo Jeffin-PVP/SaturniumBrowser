@@ -6,7 +6,15 @@ class ExtensionPermissions {
         "sounds.play",
         "cursor.change",
         "tabs.read",
-        "page.content"
+        "page.content",
+        "pages.style",
+        "pages.zoom",
+        "pages.pip",
+        "pages.autofill",
+        "clipboard.write",
+        "network.fetch",
+        "contextmenu.add",
+        "ui.openpage"
     ]);
     static sanitize(list = []) {
         if (!Array.isArray(list)) return [];
